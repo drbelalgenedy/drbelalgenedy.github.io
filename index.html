@@ -807,6 +807,22 @@ section{animation:fade .25s ease}
       </div></div>
   </div>
   <div class="card">
+    <div class="ch"><h3>مزامنة لايف بين الأجهزة</h3></div>
+    <p class="note">تربط التطبيق بقاعدة Firebase — نفس البيانات على كل الأجهزة، وأي تسجيل جديد يظهر عند الجميع فوراً. أدخل نفس البيانات على كل جهاز.</p>
+    <label>مفتاح الويب <span class="mini">(Web API Key)</span></label>
+    <input id="s_fbapi" dir="ltr" autocomplete="off" placeholder="AIza...">
+    <label>رابط قاعدة البيانات <span class="mini">(databaseURL)</span></label>
+    <input id="s_fbdb" dir="ltr" autocomplete="off" placeholder="https://xxx-default-rtdb.firebasedatabase.app">
+    <label>الإيميل</label>
+    <input id="s_fbem" dir="ltr" autocomplete="off" placeholder="user@gmail.com">
+    <label>كلمة السر <span class="mini">(للدخول فقط — لا تُحفَظ على الجهاز)</span></label>
+    <input id="s_fbpw" dir="ltr" type="password" autocomplete="off">
+    <button class="btn p" onclick="fbEnable()">تسجيل الدخول والتفعيل</button>
+    <button class="btn s" onclick="fbPush(true)">مزامنة الآن</button>
+    <button class="btn s" onclick="fbDisable()">إيقاف المزامنة</button>
+    <div style="margin-top:16px"><div class="kv"><span>الحالة</span><b id="fbinfo">—</b></div></div>
+  </div>
+  <div class="card">
     <div class="ch"><h3>نسخة لايف على GitHub</h3></div>
     <p class="note">بعد التفعيل تُرفَع نسخة كاملة من بياناتك تلقائياً إلى مستودعك على GitHub بعد كل تسجيل أو تعديل (ملف live-backup.json).<br>استخدم مستودعاً <b>خاصاً (Private)</b> ورمز وصول Fine-grained بصلاحية Contents على هذا المستودع فقط.</p>
     <label>المستودع <span class="mini">(owner/repo)</span></label>
@@ -1529,7 +1545,7 @@ let DB=JSON.parse(localStorage.getItem("bg_recs")||"[]");
 let CFG=JSON.parse(localStorage.getItem("bg_cfg")||"{}");
 if(PRESET_URL&&!CFG.url){CFG.url=PRESET_URL;localStorage.setItem("bg_cfg",JSON.stringify(CFG));}
 let kind="in",img=null,cat="",sub="",filt="all",rptYear="all",lsort="d";
-const APPVER="13.70";
+const APPVER="13.80";
 /* آيفون/آيباد/سفاري — سلوك الطباعة والتنزيل مختلف ولازم مسار خاص */
 const IOSLIKE=(function(){try{
   const ua=navigator.userAgent||"";
@@ -1554,12 +1570,12 @@ function dropOldImages(){ // يشيل صور العمليات اللي اتبع�
 function save(){ return safeSet("bg_recs",JSON.stringify(DB)); } /* مصدر واحد لمعالجة امتلاء المساحة */
 /* كتابة آمنة: امتلاء المساحة كان بيرمي استثناء يقطع الحذف/الطابور نص السكة — نشيل صور قديمة ونعيد المحاولة */
 function safeSet(k,v){
-  try{ localStorage.setItem(k,v); try{IDB.set(k,v);}catch(_m){} try{if(k!=="bg_gh")ghTouch();}catch(_g){} return true; }
+  try{ localStorage.setItem(k,v); try{IDB.set(k,v);}catch(_m){} try{if(k!=="bg_gh")ghTouch();}catch(_g){} try{fbTouch(k);}catch(_f){} return true; }
   catch(e){
     let n=0;
     try{ n=dropOldImages(); localStorage.setItem("bg_recs",JSON.stringify(DB)); }catch(_){}
     if(k==="bg_recs")v=JSON.stringify(DB);  /* بعد إسقاط الصور لازم النسخة الطازة */
-    try{ localStorage.setItem(k,v); try{IDB.set(k,v);}catch(_m){} try{if(k!=="bg_gh")ghTouch();}catch(_g){}
+    try{ localStorage.setItem(k,v); try{IDB.set(k,v);}catch(_m){} try{if(k!=="bg_gh")ghTouch();}catch(_g){} try{fbTouch(k);}catch(_f){}
       if(n)toast("المساحة امتلت — اتشالت "+n+" صورة إيصال متخزّنة عند المحاسب",1);
       return true; }
     catch(e2){ toast("مساحة الجهاز امتلت — احفظ نسخة احتياطية وامسح إيصالات قديمة",1); return false; }
@@ -2434,7 +2450,8 @@ function go(s,isBack){
     const u=bytesUsed(),pc=Math.min(100,Math.round(u/(5*1024*1024)*100));
     $("usg").innerHTML=`<span style="color:${pc>80?"var(--out)":pc>60?"#9A7B10":"var(--in)"}"><bdi>${(u/1048576).toFixed(2)} م.ب</bdi> · <bdi>${pc}%</bdi></span>`;{const e=$("pend");if(e)e.textContent=pendCount();}}
   if(s==="set"){$("s_url").value=CFG.url||"";$("s_name").value=CFG.name||"";$("s_key").value=CFG.key||"";showSet();applyFS();pinInfo();{const v=$("vinfo");if(v)v.textContent=APPVER;}
-    try{$("s_ghrepo").value=GH.repo||"";$("s_ghtok").value=GH.tok||"";$("s_ghbr").value=GH.br||"main";ghStatus();}catch(e){}}
+    try{$("s_ghrepo").value=GH.repo||"";$("s_ghtok").value=GH.tok||"";$("s_ghbr").value=GH.br||"main";ghStatus();}catch(e){}
+    try{$("s_fbapi").value=FB.api||"";$("s_fbdb").value=FB.db||"";$("s_fbem").value=FB.em||"";fbStatus();}catch(e){}}
   window.scrollTo(0,0);
 }
 let catManual=false;
@@ -3623,6 +3640,219 @@ function ghStatus(){
 }
 window.addEventListener("online",()=>{if(GH.pend)ghPush(false);});
 setTimeout(()=>{if(GH.pend)ghPush(false);},9000); /* تغييرات اتسجلت أوفلاين قبل قفل التطبيق */
+/* ===== مزامنة لايف بين الأجهزة عبر Firebase Realtime Database =====
+   الشكل على السيرفر: /data/recs/<id> لكل عملية، و/data/{pf,sal,open,trash,who}
+   كتل مختومة بطابع وقت {up,v} — الأحدث يكسب. العمليات تُدمج بالمعرّف فلا تضيع. */
+let FB={api:"",db:"",em:"",rt:"",on:0,up:{}};
+try{FB=Object.assign(FB,JSON.parse(localStorage.getItem("bg_fb")||"{}"));if(!FB.up)FB.up={};}catch(e){}
+let FBTOK={t:"",exp:0},FBSH=null,FBAPPLY=false,FBTMR=0,FBBUSY=false,FBAGAIN=false,
+    FBES=null,FBRETMR=0,FBTOKTMR=0,FBST={live:0,last:0};
+const FBSECS=["pf","sal","open","trash","who"];
+const FBKEY={bg_recs:"recs",bg_pf:"pf",bg_sal:"sal",bg_open:"open",bg_trash:"trash"};
+function fbRaw(k,v){try{localStorage.setItem(k,v);try{IDB.set(k,v);}catch(_m){}}catch(e){}}
+function saveFBRaw(){fbRaw("bg_fb",JSON.stringify(FB));}
+function cst(o){ /* تمثيل ثابت للمقارنة — السيرفر بيرجّع المفاتيح بترتيب مختلف */
+  if(o===null||typeof o!=="object")return JSON.stringify(o);
+  if(Array.isArray(o))return "["+o.map(cst).join(",")+"]";
+  return "{"+Object.keys(o).sort().filter(k=>o[k]!==undefined).map(k=>JSON.stringify(k)+":"+cst(o[k])).join(",")+"}";
+}
+function fbGet(s){return s==="pf"?PF:s==="sal"?SAL:s==="open"?OPEN:s==="trash"?(TRASH||[]):(WHO||[]);}
+function fbSetLocal(s,v){
+  if(s==="pf"){PF=Object.assign({},SEED_PF,v||{});["cash","as","dbt","due","gr","zak"].forEach(t=>{if(!Array.isArray(PF[t]))PF[t]=[];});savePF();}
+  else if(s==="sal"){SAL=Object.assign({mode:"m",amt:0,cur:"دولار",start:today().slice(0,7),dist:1,extras:[],end:""},v||{});if(!Array.isArray(SAL.extras))SAL.extras=[];saveSAL();}
+  else if(s==="open"){OPEN=v||{claim:0,date:today()};saveOPEN();}
+  else if(s==="trash"){TRASH=Array.isArray(v)?v:[];saveTRASH();
+    const ids={};TRASH.forEach(x=>{if(x.k==="rec"&&x.d&&x.d.id)ids[x.d.id]=1;});
+    const n=DB.length;DB=DB.filter(r=>!ids[r.id]);if(DB.length!==n)save();}
+  else if(s==="who"){WHO=Array.isArray(v)?v:[];fbRaw("bg_who",JSON.stringify(WHO));}
+}
+function fbTouch(k){ /* بتتنادى من safeSet مع أي حفظ بيانات */
+  if(FBAPPLY||!FB.on)return;
+  const s=FBKEY[k];if(!s)return;
+  if(s!=="recs"){FB.up[s]=Date.now();saveFBRaw();}
+  clearTimeout(FBTMR);FBTMR=setTimeout(()=>fbPush(false),2500);
+}
+function fbNormDb(u){
+  u=(u||"").trim().replace(/\/+$/,"");
+  if(u&&!/^https:\/\//i.test(u))u="https://"+u;
+  return u;
+}
+async function fbToken(){
+  if(FBTOK.t&&Date.now()<FBTOK.exp)return FBTOK.t;
+  if(!FB.rt||!FB.api)return "";
+  try{
+    const r=await fetchT("https://securetoken.googleapis.com/v1/token?key="+encodeURIComponent(FB.api),
+      {method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
+       body:"grant_type=refresh_token&refresh_token="+encodeURIComponent(FB.rt)},20000);
+    const j=await r.json();
+    if(!r.ok)return "";
+    FB.rt=j.refresh_token||FB.rt;
+    FBTOK={t:j.id_token,exp:Date.now()+((+j.expires_in||3600)-60)*1000};
+    saveFBRaw();
+    return FBTOK.t;
+  }catch(e){return "";}
+}
+async function fbPush(alertMe){
+  if(!FB.on||!FB.db){if(alertMe)toast("فعّل المزامنة أولاً",1);return;}
+  if(FBBUSY){FBAGAIN=true;return;}
+  FBBUSY=true;
+  try{
+    if(!FBSH){if(alertMe)toast("في انتظار أول اتصال بالسيرفر…",1);return;}
+    const tok=await fbToken();
+    if(!tok){if(alertMe)toast("انتهت صلاحية الدخول — سجّل الدخول من الإعدادات",1);FBST.live=0;fbStatus();return;}
+    const up={},cur={};
+    DB.forEach(r=>{cur[r.id]=cst(r);});
+    Object.keys(cur).forEach(id=>{
+      if(FBSH.recs[id]!==cur[id]){
+        const r=DB.find(x=>String(x.id)===String(id));
+        r.up=Date.now();cur[id]=cst(r);up["recs/"+id]=r;
+      }});
+    Object.keys(FBSH.recs).forEach(id=>{if(!(id in cur))up["recs/"+id]=null;});
+    FBSECS.forEach(s=>{const j=cst(fbGet(s));
+      if(FBSH.b[s]!==j)up[s]={up:FB.up[s]||Date.now(),v:fbGet(s)};});
+    if(!Object.keys(up).length){if(alertMe)toast("كل البيانات متزامنة ✓");return;}
+    const r=await fetchT(FB.db+"/data.json?auth="+encodeURIComponent(tok),
+      {method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(up)},30000);
+    if(r.ok){
+      FBSH.recs=cur;
+      FBSECS.forEach(s=>{FBSH.b[s]=cst(fbGet(s));});
+      if(Object.keys(up).some(k=>k.indexOf("recs/")===0))fbRaw("bg_recs",JSON.stringify(DB)); /* تثبيت طوابع r.up */
+      FBST.last=Date.now();fbStatus();
+      if(alertMe)toast("تمت المزامنة ✓");
+    }else if(alertMe)toast(r.status===401?"انتهت صلاحية الدخول — سجّل الدخول تاني":"تعذّرت المزامنة ("+r.status+")",1);
+  }catch(e){if(alertMe)toast("تعذّر الاتصال بالسيرفر — تحقق من الإنترنت",1);}
+  finally{FBBUSY=false;if(FBAGAIN){FBAGAIN=false;setTimeout(()=>fbPush(false),1500);}}
+}
+function fbRefresh(){ /* تحديث الشاشة المعروضة بعد وصول بيانات من جهاز تاني */
+  try{syncBar();}catch(e){}
+  try{
+    const vis=id=>{const el=$(id);return el&&!el.classList.contains("hide");};
+    if(vis("log"))renderLog();
+    if(vis("rpt"))renderRpt();
+    if(vis("trash"))renderTrash();
+    if(vis("acct"))renderAcct();
+    else if(vis("acc"))accTab(ACCTAB);
+    if(vis("reg")){try{renderStrip();}catch(e){}}
+  }catch(e){}
+}
+function fbFullMerge(d){ /* أول بث من السيرفر: دمج شامل بدون فقدان أي عملية */
+  d=d||{};
+  const sh={recs:{},b:{}};
+  const F=FBAPPLY;FBAPPLY=true;
+  try{
+    FBSECS.forEach(s=>{const inc=d[s];
+      if(inc&&inc.v!==undefined){sh.b[s]=cst(inc.v);
+        if((+inc.up||0)>(FB.up[s]||0)){fbSetLocal(s,inc.v);FB.up[s]=+inc.up||0;}}
+      else sh.b[s]="~";});
+    saveFBRaw();
+    const trashIds={};(TRASH||[]).forEach(x=>{if(x.k==="rec"&&x.d&&x.d.id)trashIds[x.d.id]=1;});
+    const srecs=(d.recs&&typeof d.recs==="object")?d.recs:{};
+    let ch=false;
+    Object.keys(srecs).forEach(id=>{const sr=srecs[id];if(!sr||typeof sr!=="object")return;
+      sh.recs[id]=cst(sr);
+      if(trashIds[sr.id])return; /* محذوفة محلياً — الدفعة الجاية هتمسحها من السيرفر */
+      const loc=DB.find(x=>String(x.id)===String(id));
+      if(!loc){DB.push(sr);ch=true;}
+      else if(cst(loc)!==cst(sr)&&(+sr.up||0)>(+loc.up||0)){DB[DB.indexOf(loc)]=sr;ch=true;}});
+    if(ch)save();
+  }finally{FBAPPLY=F;}
+  FBSH=sh;
+  fbStatus();fbRefresh();
+  setTimeout(()=>fbPush(false),1200); /* ارفع الفروق المحلية للسيرفر */
+}
+function fbRec(id,data){ /* عملية واحدة وصلت من جهاز تاني */
+  if(!FBSH)return;
+  const F=FBAPPLY;FBAPPLY=true;
+  let ch=false;
+  try{
+    if(data===null||data===undefined){
+      delete FBSH.recs[id];
+      const n=DB.length;DB=DB.filter(x=>String(x.id)!==String(id));
+      if(DB.length!==n){save();ch=true;}
+    }else{
+      const j=cst(data),old=FBSH.recs[id];
+      FBSH.recs[id]=j;
+      if(old===j)return; /* صدى إرسالنا */
+      const loc=DB.find(x=>String(x.id)===String(id));
+      if(loc){if(cst(loc)!==j&&(+data.up||0)>=(+loc.up||0)){DB[DB.indexOf(loc)]=data;save();ch=true;}}
+      else{
+        const tr=(TRASH||[]).some(x=>x.k==="rec"&&x.d&&String(x.d.id)===String(id));
+        if(!tr){DB.push(data);save();ch=true;toast("وصلت عملية جديدة من جهاز آخر");}
+      }
+    }
+  }finally{FBAPPLY=F;}
+  if(ch){FBST.last=Date.now();fbStatus();fbRefresh();}
+}
+function fbBlob(s,data){ /* كتلة (حسابات/راتب/…) وصلت من جهاز تاني */
+  if(!FBSH||!data||data.v===undefined)return;
+  const j=cst(data.v),old=FBSH.b[s];
+  FBSH.b[s]=j;
+  if(old===j)return;
+  if((+data.up||0)<=(FB.up[s]||0))return; /* نسختنا المحلية أحدث */
+  const F=FBAPPLY;FBAPPLY=true;
+  try{fbSetLocal(s,data.v);FB.up[s]=+data.up||0;saveFBRaw();}finally{FBAPPLY=F;}
+  FBST.last=Date.now();fbStatus();fbRefresh();
+}
+async function fbStream(){
+  if(!FB.on||!FB.db)return;
+  const tok=await fbToken();
+  if(!tok){FBST.live=0;fbStatus();clearTimeout(FBRETMR);FBRETMR=setTimeout(fbStream,30000);return;}
+  try{FBES&&FBES.close();}catch(e){}
+  const es=new EventSource(FB.db+"/data.json?auth="+encodeURIComponent(tok));
+  FBES=es;
+  es.addEventListener("put",e=>{try{
+    const m=JSON.parse(e.data),p=String(m.path||"/");
+    if(p==="/")fbFullMerge(m.data);
+    else if(p.indexOf("/recs/")===0&&p.split("/").length===3)fbRec(p.slice(6),m.data);
+    else{const s=p.slice(1);if(FBSECS.indexOf(s)>-1)fbBlob(s,m.data);}
+  }catch(x){}});
+  es.addEventListener("patch",e=>{try{
+    const m=JSON.parse(e.data);
+    if(String(m.path||"/")!=="/"||!m.data)return;
+    Object.keys(m.data).forEach(k=>{
+      if(k.indexOf("recs/")===0)fbRec(k.slice(5),m.data[k]);
+      else if(FBSECS.indexOf(k)>-1)fbBlob(k,m.data[k]);});
+  }catch(x){}});
+  es.addEventListener("auth_revoked",()=>{FBTOK={t:"",exp:0};fbStream();});
+  es.onopen=()=>{FBST.live=1;fbStatus();};
+  es.onerror=()=>{FBST.live=0;fbStatus();try{es.close();}catch(x){}
+    if(FBES===es){clearTimeout(FBRETMR);FBRETMR=setTimeout(fbStream,8000);}};
+  clearTimeout(FBTOKTMR);
+  FBTOKTMR=setTimeout(fbStream,Math.max(60000,FBTOK.exp-Date.now()-120000)); /* جدّد البث قبل انتهاء التوكن */
+}
+async function fbEnable(){
+  const api=$("s_fbapi").value.trim(),db=fbNormDb($("s_fbdb").value),
+        em=$("s_fbem").value.trim(),pw=$("s_fbpw").value;
+  if(!api||!db||!em||!pw){toast("اكمل البيانات الأربعة الأول",1);return;}
+  try{
+    const r=await fetchT("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+encodeURIComponent(api),
+      {method:"POST",headers:{"Content-Type":"application/json"},
+       body:JSON.stringify({email:em,password:pw,returnSecureToken:true})},20000);
+    const j=await r.json();
+    if(!r.ok){const m=(j.error&&j.error.message)||"";
+      toast(/PASSWORD|EMAIL|INVALID_LOGIN|USER/.test(m)?"الإيميل أو كلمة السر غير صحيحة":"تعذّر الدخول"+(m?": "+m:""),1);return;}
+    FB.api=api;FB.db=db;FB.em=em;FB.rt=j.refreshToken;FB.on=1;
+    FBTOK={t:j.idToken,exp:Date.now()+((+j.expiresIn||3600)-60)*1000};
+    saveFBRaw();$("s_fbpw").value="";
+    toast("اتفعّلت المزامنة اللايف ✓");
+    fbStatus();fbStream();
+  }catch(e){toast("تعذّر الاتصال — تحقق من الإنترنت",1);}
+}
+function fbDisable(){
+  FB.on=0;FB.rt="";FBTOK={t:"",exp:0};
+  try{FBES&&FBES.close();}catch(e){}
+  FBES=null;FBSH=null;clearTimeout(FBRETMR);clearTimeout(FBTOKTMR);
+  saveFBRaw();fbStatus();toast("اتوقفت المزامنة — البيانات فضلت على الجهاز");
+}
+function fbStatus(){
+  const el=$("fbinfo");if(!el)return;
+  if(!FB.on){el.innerHTML='<span style="color:var(--out)">غير مفعّلة</span>';return;}
+  const t=FBST.last?new Date(FBST.last):null;
+  el.innerHTML=(FBST.live?'<span style="color:var(--in)">متصل لايف ✓</span>':'<span style="color:#9A7B10">مفعّلة — في انتظار الاتصال</span>')
+    +(t?" · آخر مزامنة "+("0"+t.getHours()).slice(-2)+":"+("0"+t.getMinutes()).slice(-2):"");
+}
+window.addEventListener("online",()=>{if(FB.on){fbStream();}});
+setTimeout(()=>{if(FB.on)fbStream();},3000);
 async function encJSON(obj,pw){
   const enc=new TextEncoder();
   const salt=crypto.getRandomValues(new Uint8Array(16));
