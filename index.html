@@ -1167,16 +1167,19 @@ function _zip(files){
 }
 function _e(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function _col(n){let s="";while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=(n-m-1)/26;}return s;}
-const S={ttl:1,sub:2,hd:3,tx:4,txw:5,ct:6,mn:7,nu:8,sep:9,tot:10,totm:11,spc:12};
+const S={ttl:1,sub:2,hd:3,tx:4,txw:5,ct:6,mn:7,nu:8,sep:9,tot:10,totm:11,spc:12,sepm:13};
 function _cell(r,c,v,st){
   const ref=_col(c)+r, s=st?` s="${st}"`:"";
-  if(typeof v==="number"&&isFinite(v))return `<c r="${ref}"${s}><v>${v}</v></c>`;
+  if(typeof v==="number")return isFinite(v)?`<c r="${ref}"${s}><v>${v}</v></c>`:`<c r="${ref}"${s}/>`;
   if(v===""||v==null)return `<c r="${ref}"${s}/>`;
   return `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${_e(v)}</t></is></c>`;
 }
 function XSheetBuilder(cols){
   return {rows:[],merges:[],w:cols,
-    add(cells,h){this.rows.push({c:cells,h:h||0});return this.rows.length;},
+    add(cells,h){
+      /* نص ملتف طويل = بلا ارتفاع ثابت فيتمدد تلقائياً بدل ما يتقص */
+      const long=cells.some(x=>Array.isArray(x)&&(x[1]===S.txw||x[1]===S.spc)&&typeof x[0]==="string"&&x[0].length>45);
+      this.rows.push({c:cells,h:long?0:(h||0)});return this.rows.length;},
     merge(r,n){this.merges.push(`${_col(1)}${r}:${_col(n)}${r}`);},
     xml(){
       const nc=this.w.length;
@@ -1217,7 +1220,7 @@ const _STYLES=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>
 <border><left style="thin"><color rgb="FF9AA7B4"/></left><right style="thin"><color rgb="FF9AA7B4"/></right><top style="thin"><color rgb="FF9AA7B4"/></top><bottom style="thin"><color rgb="FF9AA7B4"/></bottom><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="13">
+<cellXfs count="14">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
 <xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
@@ -1231,6 +1234,7 @@ const _STYLES=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xf numFmtId="0" fontId="4" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
 <xf numFmtId="164" fontId="4" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
 <xf numFmtId="0" fontId="0" fillId="5" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="164" fontId="5" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
 </cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
 function buildXLSX(sheets,author){
   const N=sheets.length;
@@ -1249,7 +1253,7 @@ ${sheets.map((s,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" Content
   const wb=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
 <sheets>${sheets.map((s,i)=>`<sheet name="${_e(s.name)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join("")}</sheets>
-<definedNames>${sheets.map((s,i)=>`<definedName name="_xlnm.Print_Titles" localSheetId="${i}">'${s.name}'!$4:$4</definedName>`).join("")}</definedNames></workbook>`;
+<definedNames>${sheets.map((s,i)=>`<definedName name="_xlnm.Print_Titles" localSheetId="${i}">'${_e(s.name).replace(/'/g,"''")}'!$4:$4</definedName>`).join("")}</definedNames></workbook>`;
   const wbr=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 ${sheets.map((s,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join("")}
@@ -1267,6 +1271,8 @@ function exportXLS(){
   const hasPf=["cash","as","dbt","due","gr","zak"].some(t=>(PF[t]||[]).length);
   if(!DB.length && !hasPf && !(SAL.amt>0) && !OPEN.claim){toast("لا توجد بيانات للتصدير بعد",1);return;}
   const all=[...DB].sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
+  /* نفس fallback المحرك: عملية دولارية بلا usd تتحسب بقيمتها — عشان مجاميع الدولار تطابق باقي الأوراق */
+  const usdOf=r=>(typeof r.usd==="number")?r.usd:(r.cur==="دولار"?r.amt:null);
   const per=CFG.name||"—", rng=all.length?(all[0].date+" — "+all[all.length-1].date):"لا توجد عمليات مسجَّلة بعد", CU=[...new Set(all.map(r=>r.cur))];
   const T=(b,n,title,sub)=>{b.add([[title,S.ttl]],26);b.merge(1,n);b.add([[sub,S.sub]],18);b.merge(2,n);b.add([""],8);};
   const HD=(b,hs)=>b.add(hs.map(h=>[h,S.hd]),30);
@@ -1282,14 +1288,14 @@ function exportXLS(){
   all.forEach(r=>{const m=r.date.slice(0,7);
     if(m!==lastM){if(lastM)MTOT("إجمالي "+MON[+lastM.slice(5,7)-1]+" "+lastM.slice(0,4));
       SEP(b1,"حركة شهر "+MON[+m.slice(5,7)-1]+" "+m.slice(0,4),H1.length);lastM=m;ms=0;mu=0;mc=new Set();}
-    ms+=r.ref?-r.amt:r.amt; mu+=(typeof r.usd==="number")?(r.ref?-r.usd:r.usd):0; mc.add(r.cur);
+    ms+=r.ref?-r.amt:r.amt; {const u9=usdOf(r);mu+=(u9==null)?0:(r.ref?-u9:u9);} mc.add(r.cur);
     const amt=r.ref?-r.amt:r.amt, usd=(r.usd!==""&&r.usd!=null)?(r.ref?-r.usd:r.usd):"";
     b1.add([[i++,S.nu],[r.date,S.tx],[(r.ref?"مُسترد":label(r.k)),S.ct],[catName(r.cat),S.txw],[r.sub||"",S.txw],[r.cat||"",S.ct],
       [r.who||"",S.tx],[r.des||"",S.txw],[amt,S.mn],[r.cur,S.ct],[r.fx||"",r.fx?S.mn:S.ct],[usd,usd!==""?S.mn:S.ct],[(r.img||r.imgf)?"مرفق":"—",S.ct]],32);});
   if(lastM)MTOT("إجمالي "+MON[+lastM.slice(5,7)-1]+" "+lastM.slice(0,4));
   if(!all.length){const r1=b1.add([["لا توجد عمليات مسجَّلة بعد",S.spc]],30);b1.merge(r1,H1.length);}
   else TOT(b1,"الإجمالي العام",H1.length,{8:(CU.length===1?all.reduce((a,r)=>a+(r.ref?-r.amt:r.amt),0):"—"),
-    11:all.reduce((a,r)=>a+((typeof r.usd==="number")?(r.ref?-r.usd:r.usd):0),0)});
+    11:all.reduce((a,r)=>{const u9=usdOf(r);return a+(u9==null?0:(r.ref?-u9:u9));},0)});
   /* ٢) كشف المطالبة */
   const H2=["م","البند","النوع الفرعي","الكود","عدد العمليات","المدفوع","المُسترد","صافي المطالبة","العملة","المقابل بالدولار","الإيصال"];
   const b2=XSheetBuilder([6,22,20,10,11,13,12,16,11,14,22]);
@@ -1298,8 +1304,9 @@ function exportXLS(){
   const custSp=all.filter(r=>r.k==="co"&&r.src==="cust");
   all.filter(r=>r.k==="co"&&r.src!=="cust").forEach(r=>{const k=r.cur+"|"+r.cat+"|"+(r.sub||"");
     cl[k]=cl[k]||{cur:r.cur,c:r.cat,s:r.sub||"",n:0,t:0,rf:0,u:0,g:0};cl[k].n++;
-    if(r.ref){cl[k].rf+=r.amt;if(typeof r.usd==="number")cl[k].u-=r.usd;}
-    else{cl[k].t+=r.amt;if(typeof r.usd==="number")cl[k].u+=r.usd;}
+    const u9=usdOf(r);
+    if(r.ref){cl[k].rf+=r.amt;if(u9!=null)cl[k].u-=u9;}
+    else{cl[k].t+=r.amt;if(u9!=null)cl[k].u+=u9;}
     if(r.img||r.imgf)cl[k].g++;});
   const byC={};Object.values(cl).forEach(x=>(byC[x.cur]=byC[x.cur]||[]).push(x));
   let j=1;
@@ -1308,8 +1315,14 @@ function exportXLS(){
     byC[cu].sort((a,b)=>(b.t-b.rf)-(a.t-a.rf)).forEach(x=>{const net=x.t-x.rf;t+=net;tu+=x.u;
       b2.add([[j++,S.nu],[catName(x.c),S.txw],[x.s,S.txw],[x.c,S.ct],[x.n,S.nu],[R2(x.t),S.mn],[x.rf?R2(x.rf):"",x.rf?S.mn:S.ct],
         [R2(net),S.mn],[x.cur,S.ct],[x.u?R2(x.u):"",x.u?S.mn:S.ct],[x.g?(x.g+" إيصال مرفق"):"بدون إيصال",S.txw]],32);});
-    TOT(b2,"صافي المطالبة — "+cu,H2.length,{7:t,9:tu});});
+    TOT(b2,"صافي مصروفات المطالبة — "+cu,H2.length,{7:t,9:tu});});
   if(!Object.keys(byC).length)b2.add([["لا توجد مطالبات",S.txw]].concat(Array(H2.length-1).fill(["",S.tx])),32);
+  {const ex2=claimCalc().extras;
+   if(ex2.length){const te2=Math.round(ex2.reduce((a,e)=>a+e.extra,0)*100)/100;
+     SEP(b2,"مدفوع من ماله زيادة عن رصيد العهدة — دولار (جزء من المطالبة)",H2.length);
+     ex2.forEach(e=>b2.add([[j++,S.nu],[catName(e.r.cat),S.txw],[e.r.sub||"",S.txw],[e.r.cat,S.ct],[1,S.nu],[R2(e.extra),S.mn],["",S.ct],
+       [R2(e.extra),S.mn],["دولار",S.ct],[R2(e.extra),S.mn],["جزء من مصروف عهدة "+R2(e.r.amt),S.txw]],32));
+     TOT(b2,"إجمالي الزائد عن العهدة — دولار",H2.length,{7:te2,9:te2});}}
   if(custSp.length){const rc=b2.add([["المصروف من العُهد ("+custSp.length+" عملية) ليس مطالبة — من مال الشركة، تفاصيله بتقرير الشركة.",S.spc]],28);b2.merge(rc,H2.length);}
   /* ٣) المصروفات الشخصية */
   const yrs=[...new Set(all.map(r=>r.date.slice(0,4)))].sort();
@@ -1358,6 +1371,8 @@ function exportXLS(){
     SEP(b5,"مكوّنات الرصيد الافتتاحي — بالدولار",3);
     OPEN.br.forEach(x=>b5.add([[x.name,S.txw],[R2(+x.amt||0),S.mn],[[x.st,x.note].filter(Boolean).join(" — "),S.txw]],28));
     TOT(b5,"إجمالي مكوّنات الرصيد الافتتاحي",3,{1:OPEN.br.reduce((a,x)=>a+(+x.amt||0),0)});
+    {const od5=Math.round((cc.open-OPEN.br.reduce((a,x)=>a+(+x.amt||0),0))*100)/100;
+     if(Math.abs(od5)>0.009)b5.add([["فرق غير موزَّع على المكوّنات",S.txw],[R2(od5),S.mn],["الرصيد الافتتاحي أعلاه يشمله — راجعه مع المحاسب",S.txw]],28);}
   }
   if(cc.un){const r5=b5.add([["عمليات بعملات أخرى بدون سعر صرف — غير مُدرجة: "+Object.entries(cc.per).map(([k,v])=>R2(v)+" "+k).join(" · "),S.spc]],26);b5.merge(r5,3);}
   const sc=salCalc();
@@ -1373,7 +1388,7 @@ function exportXLS(){
   const H6C=["م","البنك / الحساب","نوع الحساب","آخر تحديث","الرصيد","العملة","ملاحظات"];
   const b6c=XSheetBuilder([6,26,18,16,16,11,30]);
   T(b6c,H6C.length,"النقدية والبنوك","المُعد: "+per+"   |   تاريخ الطباعة: "+today());HD(b6c,H6C);
-  (PF.cash||[]).forEach((x,i)=>b6c.add([[i+1,S.nu],[x.name,S.txw],[x.own||"",S.txw],[x.st||"",S.ct],
+  (PF.cash||[]).forEach((x,i)=>b6c.add([[i+1,S.nu],[x.name,S.txw],[x.own||"",S.txw],[x.st||x.pay||"",S.ct],
     [x.amt?R2(+x.amt):"",x.amt?S.mn:S.ct],[x.amt?x.cur:"",S.ct],[x.note||"",S.txw]],30));
   {const ct={};(PF.cash||[]).forEach(x=>{if(+x.amt)ct[x.cur]=(ct[x.cur]||0)+(+x.amt);});
    Object.entries(ct).forEach(([c,v])=>TOT(b6c,"إجمالي النقدية — "+c,H6C.length,{4:v}));
@@ -1402,11 +1417,11 @@ function exportXLS(){
       if(!LN.length)return;
       SEP(b7,"كشف حساب تفصيلي — "+x.name+" ("+LN.length+" حركة)",H7.length);
       {const MM=ACTMAP[t]||ACTMAP.gr;
-       b7.add([["م",S.hd],["التاريخ",S.hd],["البيان",S.hd],[MM.p,S.hd],[MM.m,S.hd],
-               ["الرصيد",S.hd],["العملة",S.hd],["",S.hd]],26);}
+       b7.add([["م",S.hd],["البيان",S.hd],["التاريخ",S.hd],[MM.p,S.hd],[MM.m,S.hd],
+               ["الرصيد",S.hd],["العملة",S.hd],["ملاحظات",S.hd]],26);}
       let bl=0,tp=0,tm=0;
       LN.forEach((r,i)=>{const v=+r.v||0,plus=r.k!=="-";bl+=plus?v:-v;plus?tp+=v:tm+=v;
-        b7.add([[i+1,S.nu],[r.d||"",S.ct],[r.s||"",S.txw],
+        b7.add([[i+1,S.nu],[r.s||"",S.txw],[r.d||"",S.ct],
           [plus?R2(v):"",plus?S.mn:S.ct],[plus?"":R2(v),plus?S.ct:S.mn],
           [R2(bl),S.mn],[x.cur||"دولار",S.ct],["",S.tx]],28);});
       TOT(b7,"إجمالي حركة "+x.name,H7.length,{3:tp,4:tm,5:bl});
@@ -1449,6 +1464,7 @@ function exportXLS(){
    blk9("عُهد مستلمة",D.CR);
    blk9("مصروف من العهدة",D.CS);
    if(D.CR.length||D.CS.length)TOT(b9,"رصيد العهدة غير المسوَّى",4,{2:cc9.cust});
+   if(cc9.over){const ro=b9.add([["منها "+R2(cc9.over)+" $ صُرفت بما يجاوز رصيد العهدة وأُضيفت للمطالبة",S.spc],["",S.spc],["",S.spc],["",S.spc]],26);b9.merge(ro,4);}
   }
   /* ١٠) قائمة المركز المالي الشخصي */
   const H10=["البند","العملة","القيمة"];
@@ -1516,7 +1532,7 @@ let DB=JSON.parse(localStorage.getItem("bg_recs")||"[]");
 let CFG=JSON.parse(localStorage.getItem("bg_cfg")||"{}");
 if(PRESET_URL&&!CFG.url){CFG.url=PRESET_URL;localStorage.setItem("bg_cfg",JSON.stringify(CFG));}
 let kind="in",img=null,cat="",sub="",filt="all",rptYear="all",lsort="d";
-const APPVER="13.60";
+const APPVER="13.70";
 /* آيفون/آيباد/سفاري — سلوك الطباعة والتنزيل مختلف ولازم مسار خاص */
 const IOSLIKE=(function(){try{
   const ua=navigator.userAgent||"";
@@ -1581,6 +1597,13 @@ if(!PF){PF=SEED_PF;localStorage.setItem("bg_pf",JSON.stringify(PF));}
    localStorage.setItem("bg_mgcash","1");
  }}catch(e){}
  if(fx)localStorage.setItem("bg_pf",JSON.stringify(PF));}
+/* إصلاح بيانات: بند مثبَّت الحركات وسداده متمثّل كحركات سالبة لكن paid القديم فاضل — كان بيتخصم مرتين */
+try{let fx2=0;["dbt","due"].forEach(t=>(PF[t]||[]).forEach(x=>{
+  if(x.lines&&x.lines.length&&(+x.paid||0)>0){
+    const ng=x.lines.reduce((a,l)=>a+(l.k==="-"?(+l.v||0):0),0);
+    if(ng>=(+x.paid)-0.01){x.paid=0;x.pays=[];fx2=1;}
+  }}));
+ if(fx2)localStorage.setItem("bg_pf",JSON.stringify(PF));}catch(e){}
 let SAL=JSON.parse(localStorage.getItem("bg_sal")||"null");
 if(!SAL){SAL={mode:"m",amt:0,cur:"دولار",start:today().slice(0,7),dist:1,extras:[]};localStorage.setItem("bg_sal",JSON.stringify(SAL));}
 let OPEN=JSON.parse(localStorage.getItem("bg_open")||"null");
@@ -1991,6 +2014,8 @@ function acctMat(){
     "الكشف مبني تلقائياً من بيانات البند. هيتثبَّت كـ"+R.length+" حركة تقدر تعدّل فيها أو تحذف منها — والأرصدة زي ما هي.",()=>{
       x.lines=R.map(r=>({d:r.d||"",s:r.s||"",v:+r.v||0,k:r.k==="-"?"-":"+"}));
       x.amt=acctCalc().bal;
+      /* السداد بقى حركات سالبة جوه الكشف — تصفيره يمنع خصمه مرة تانية من المتبقي */
+      if(ACT.t==="dbt"||ACT.t==="due"){x.paid=0;x.pays=[];}
       acctPersist(x);
       renderAcct();toast("الحركات بقت قابلة للتعديل");
     });
@@ -2097,34 +2122,36 @@ function claimXLS(){
   b1.add([""],8);
   b1.add([["البند",S.hd],["عدد البنود",S.hd],["القيمة بالدولار",S.hd],["ملاحظات",S.hd]],30);
   {const G={};R.forEach(r=>{G[r.g]=G[r.g]||{n:0,v:0,st:r.st};G[r.g].n++;G[r.g].v+=r.usd;});
-   b1.add([["أولاً: مصروفات ومستحقات على الشركة",S.sep],["",S.sep],["",S.sep],["",S.sep]],26);
+   {const r0=b1.add([["أولاً: مصروفات ومستحقات على الشركة",S.sep],["",S.sep],["",S.sep],["",S.sep]],26);b1.merge(r0,4);}
    Object.entries(G).forEach(([k,v])=>b1.add([[k,S.txw],[v.n,S.nu],[R2(v.v),S.mn],[v.st||"",S.txw]],28));
    TOTX(b1,"إجمالي المطالبة",4,{2:R.reduce((a,r)=>a+r.usd,0)});
    if(P.length&&CLM.st==="all"){
-     b1.add([["ثانياً: المسدَّد من الشركة",S.sep],["",S.sep],["",S.sep],["",S.sep]],26);
+     {const r0=b1.add([["ثانياً: المسدَّد من الشركة",S.sep],["",S.sep],["",S.sep],["",S.sep]],26);b1.merge(r0,4);}
      b1.add([["دفعات وردّ مصروفات",S.txw],[P.length,S.nu],[R2(P.reduce((a,r)=>a+r.usd,0)),S.mn],["",S.tx]],28);
      TOTX(b1,"إجمالي المسدَّد",4,{2:P.reduce((a,r)=>a+r.usd,0)});
    }
-   b1.add([["",S.tx],["",S.tx],["",S.tx],["",S.tx]],10);
+   b1.add(["","","",""],10);
    if(CLM.st==="all"){const pre=claimPre();
+    const od=Math.round((OPEN.claim-(OPEN.br||[]).reduce((a,b)=>a+(+b.amt||0),0))*100)/100;
     if(pre)b1.add([["+ صافي حركة ما قبل الفترة المعروضة",S.txw],["",S.ct],[R2(pre),S.mn],["",S.tx]],28);
-    TOTX(b1,"رصيد المطالبة",4,{2:(R.reduce((a,r)=>a+r.usd,0)+pre-P.reduce((a,r)=>a+r.usd,0))});}
+    if(od)b1.add([["+ رصيد افتتاحي غير موزَّع على المكوّنات",S.txw],["",S.ct],[R2(od),S.mn],["",S.tx]],28);
+    TOTX(b1,"رصيد المطالبة",4,{2:(R.reduce((a,r)=>a+r.usd,0)+pre+od-P.reduce((a,r)=>a+r.usd,0))});}
    else{ /* عرض جزئي حسب الحالة — الرصيد الكامل من المحرك */
     TOTX(b1,"إجمالي البنود المعروضة ("+(CLM.st==="ok"?"المعتمد فقط":"قيد المراجعة فقط")+")",4,{2:R.reduce((a,r)=>a+r.usd,0)});
     TOTX(b1,"رصيد المطالبة الكامل (كل البنود)",4,{2:claimCalc().bal});}
    /* الملاحظات بعد الرصيد — مش وسط الحساب */
    {const w=R.filter(r=>r.n&&r.n.indexOf("بانتظار سعر الصرف")>-1);
     if(w.length){
-      b1.add([["",S.tx],["",S.tx],["",S.tx],["",S.tx]],10);
-      b1.add([["ملاحظة",S.sep],["",S.sep],["",S.sep],["",S.sep]],26);
+      b1.add(["","","",""],10);
+      {const r0=b1.add([["ملاحظة",S.sep],["",S.sep],["",S.sep],["",S.sep]],26);b1.merge(r0,4);}
       b1.add([[w.length+" بند بانتظار تحديد سعر الصرف — غير محتسب في الإجمالي أعلاه",S.spc],["",S.spc],["",S.spc],["",S.spc]],28);
     }}
    /* تنبيه داخلي للعميل — لا يظهر في المستند */
    {const nd=R.filter(r=>r.sum);
     if(nd.length)setTimeout(()=>toast(nd.length+" بند بلا تفاصيل — استورد ملف البيانات المحدَّث",1),900);}
    if(CLM.sal&&SAL.amt>0){const sc=salCalc();
-     b1.add([["",S.tx],["",S.tx],["",S.tx],["",S.tx]],10);
-     b1.add([["ثالثاً: مستحقات الراتب والحوافز (منفصلة عن المطالبة)",S.sep],["",S.sep],["",S.sep],["",S.sep]],26);
+     b1.add(["","","",""],10);
+     {const r0=b1.add([["ثالثاً: مستحقات الراتب والحوافز (منفصلة عن المطالبة)",S.sep],["",S.sep],["",S.sep],["",S.sep]],26);b1.merge(r0,4);}
      b1.add([["المستحق حتى الآن ("+sc.n+" شهر)",S.txw],["",S.ct],[R2(sc.acc),S.mn],[SAL.cur,S.ct]],28);
      if(sc.ext)b1.add([["حوافز ومستحقات إضافية",S.txw],[SAL.extras.length,S.nu],[R2(sc.ext),S.mn],[SAL.cur,S.ct]],28);
      b1.add([["المقبوض",S.txw],["",S.ct],[R2(sc.rec),S.mn],[SAL.cur,S.ct]],28);
@@ -2141,7 +2168,7 @@ function claimXLS(){
     if(r.g!==g){g=r.g;
       const gr=R.filter(z=>z.g===g);
       const rw=b2.add([[g+"  ("+gr.length+" بند)",S.sep],["",S.sep],["",S.sep],["",S.sep],["",S.sep],
-                       ["",S.sep],["",S.sep],["",S.sep],[R2(gr.reduce((a,z)=>a+z.usd,0)),S.sep],["",S.sep]],26);}
+                       ["",S.sep],["",S.sep],["",S.sep],[R2(gr.reduce((a,z)=>a+z.usd,0)),S.sepm],["",S.sep]],26);}
     b2.add([[i++,S.nu],[r.d?dmy(r.d):"غير محدد",S.ct],[r.g,S.txw],[desFull(r.s),S.txw],[r.src||"",S.txw],
       [r.orig?R2(r.orig):"",r.orig?S.mn:S.ct],[r.ocur||"",S.ct],[r.fx?R2(r.fx):"",r.fx?S.mn:S.ct],
       [r.usd?R2(r.usd):"",r.usd?S.mn:S.ct],[r.n||"",S.txw]],28);});
@@ -2158,7 +2185,7 @@ function claimXLS(){
       [R2(r.usd),S.mn]],28));
     TOTX(b3,"إجمالي المسدَّد",H3.length,{7:P.reduce((a,r)=>a+r.usd,0)});}
   else {const e=b3.add([["لا توجد مبالغ مسدَّدة حتى تاريخه",S.spc]],30);b3.merge(e,H3.length);}
-  b1.add([["",S.tx],["",S.tx],["",S.tx],["",S.tx]],14);
+  b1.add(["","","",""],14);
   b1.add([["مُقدِّم المطالبة: "+per+"          التوقيع: ..............................",S.spc],["",S.spc],["",S.spc],["",S.spc]],30);
   b1.add([["استلام الشركة — الاسم والتوقيع: ..............................",S.spc],["",S.spc],["",S.spc],["",S.spc]],30);
   dl(buildXLSX([{name:"تقرير المطالبة",b:b1},{name:"تفاصيل المطالبة",b:b2},{name:"المسدَّد من الشركة",b:b3}],per),
@@ -2171,7 +2198,8 @@ function claimPrint(){
   const R=R0.slice().sort((a,b)=>(GT[b.g]-GT[a.g])||String(a.d||"").localeCompare(String(b.d||"")));
   if(!R.length){toast("لا توجد بنود مطالبة",1);return;}
   const pre=claimPre(); /* حركة ما قبل الفترة — الرقم النهائي يفضل صحيحاً مهما كان الفلتر */
-  const bal=Math.round((R.reduce((a,r)=>a+r.usd,0)+pre-P.reduce((a,r)=>a+r.usd,0))*100)/100;
+  const od=Math.round((OPEN.claim-(OPEN.br||[]).reduce((a,b)=>a+(+b.amt||0),0))*100)/100; /* افتتاحي غير موزَّع على المكوّنات */
+  const bal=Math.round((R.reduce((a,r)=>a+r.usd,0)+pre+od-P.reduce((a,r)=>a+r.usd,0))*100)/100;
   const HEAD=`<tr><th class="c" style="width:7%">م</th><th class="c" style="width:12%">التاريخ</th>`+
     `<th>البيان</th><th class="c" style="width:12%">الأصلي</th><th class="c" style="width:10%">العملة</th>`+
     `<th class="c" style="width:11%">سعر الصرف</th><th class="n" style="width:15%">بالدولار</th></tr>`;
@@ -2187,6 +2215,7 @@ function claimPrint(){
   if(CLM.st==="all"){
     ROWS+=`<tr class="tot"><td colspan="6">إجمالي المطالبة</td><td class="n">${fmt(R.reduce((a,r)=>a+r.usd,0))}</td></tr>`;
     if(pre)ROWS+=`<tr class="tot"><td colspan="6">+ صافي حركة ما قبل الفترة المعروضة</td><td class="n">${fmt(pre)}</td></tr>`;
+    if(od)ROWS+=`<tr class="tot"><td colspan="6">+ رصيد افتتاحي غير موزَّع على المكوّنات</td><td class="n">${fmt(od)}</td></tr>`;
     if(P.length)ROWS+=`<tr class="tot"><td colspan="6">− المسدَّد من الشركة (${P.length})</td><td class="n">${fmt(P.reduce((a,r)=>a+r.usd,0))}</td></tr>`;
     ROWS+=`<tr class="net"><td colspan="6">${bal>=0?"رصيد المطالبة":"مستحق للشركة (الرصيد سالب)"}</td><td class="n ${bal>=0?"p":"m"}">${fmt(bal)} $</td></tr>`;
   }else{
@@ -2209,7 +2238,9 @@ function claimPrint(){
   prDoc("تقرير المطالبة",CFG.name||"—",new Date(),ROWS,false,R.length+" بند · "+clmTxt()+" · جميع القيم بالدولار الأمريكي",HEAD);
 }
 function TOTX(b,label,n,vals){const c=[[label,S.tot]];
-  for(let i=1;i<n;i++)c.push(vals&&vals[i]!==undefined?[Math.round((+vals[i]||0)*100)/100,S.totm]:["",S.tot]);
+  for(let i=1;i<n;i++){const v=vals&&vals[i];
+    /* غير الرقمي («—» عند تعدد العملات) يمر كنص — كان بيتحول 0.00 مضللة */
+    c.push(v===undefined?["",S.tot]:(typeof v==="number"&&isFinite(v)?[Math.round(v*100)/100,S.totm]:[String(v),S.tot]));}
   b.add(c,22);}
 function acctFxTgl(){const f=$("acfx"),b=$("acfxbtn");if(!f)return;
   const op=f.classList.toggle("hide");if(b)b.classList.toggle("open",!op);
@@ -2267,6 +2298,14 @@ function saveRecLine(){
   if(!x.lines.length&&Math.abs(+x.amt||0)>0.009&&ACT.ix<0){
     const a0=Math.round((+x.amt||0)*100)/100;
     x.lines.push({d:(x.since||d),s:"رصيد افتتاحي",v:Math.abs(a0),k:a0<0?"-":"+"});
+    /* الدفعات المسجلة تتثبّت كحركات سالبة هي كمان — وإلا تختفي من الكشف ويتشال خصمها مرتين */
+    if(ACT.t==="dbt"||ACT.t==="due"){
+      const PS=Array.isArray(x.pays)?x.pays:[];
+      PS.forEach(p2=>{if(+p2.a)x.lines.push({d:p2.d||d,s:"سداد",v:Math.round((+p2.a)*100)/100,k:"-"});});
+      const rest0=(+x.paid||0)-PS.reduce((t2,p2)=>t2+(+p2.a||0),0);
+      if(rest0>0.009)x.lines.push({d:d,s:"مسدَّد سابق (بدون تاريخ مفصَّل)",v:Math.round(rest0*100)/100,k:"-"});
+      x.paid=0;x.pays=[];
+    }
   }
   const rec={d:d,s:des,v:Math.round(v*100)/100,k:ACT.k};
   {const o=acctNum("ac_orig"),r=acctNum("ac_fx");
@@ -3052,7 +3091,8 @@ function printCo(){
   if(D.S.length){rows+=secT("مدفوع عن الشركة")+blk("s","مصروفات",D.S);}
   if(D.P.length){rows+=secT("المسدَّد من الشركة")+blk("p","مقبوضات",D.P);}
   if(D.CR.length||D.CS.length){rows+=secT("العُهد")+blk("cr","عُهد مستلمة",D.CR)+blk("cs","مصروف من العهدة",D.CS)
-    +`<tr class="net"><td>رصيد العهدة غير المسوَّى</td><td class="c">دولار</td><td class="n num ${c.cust>0?"m":"p"}">${fmt(c.cust)}</td></tr>`;}
+    +`<tr class="net"><td>رصيد العهدة غير المسوَّى</td><td class="c">دولار</td><td class="n num ${c.cust>0?"m":"p"}">${fmt(c.cust)}</td></tr>`
+    +(c.over?`<tr class="it"><td>منها ما يجاوز رصيد العهدة — أُضيف للمطالبة</td><td class="c">دولار</td><td class="n num">${fmt(c.over)}</td></tr>`:"");}
   prDoc("تقرير الشركة",who,d,rows,ONE,"التفاصيل حسب التصفية: "+perFull());
 }
 function renderCo(){
@@ -3342,7 +3382,7 @@ async function cloudRestore(auto){
       const uV=(x.usd===""||x.usd==null)?"":num(x.usd);
       DB.push({id:Number(x.id)||Date.now()+added,k:x.kind||"out",date:x.date||today(),amt:Math.abs(num(x.amt)||0),
         cur:x.cur||"دولار",who:x.from||"",cat:x.code||"",sub:x.sub||"",des:des,img:"",src:isCust?"cust":"",
-        fx:num(x.fx)||"",usd:(uV===""||uV===undefined)?"":Math.abs(uV),ref:x.ref?1:0,sy:1});
+        fx:num(x.fx)||"",usd:(uV===""||uV===undefined)?((x.cur||"دولار")==="دولار"?Math.abs(num(x.amt)||0):""):Math.abs(uV),ref:x.ref?1:0,sy:1});
       added++;});
     /* حذف متبادل بين الأجهزة: المتزامن (sy=1) الغايب من الشيت في سحبتين متتاليتين = اتحذف من جهاز تاني → سلة المحذوفات
        بشرط قائمة غير فاضية — شيت فاضي (رابط جديد مثلاً) ميمسحش السجل كله */
