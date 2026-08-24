@@ -693,11 +693,13 @@ section{animation:fade .25s ease}
 <section id="rpt" class="hide">
   <div class="card" id="rptbar">
     <div class="ch"><h3>التقارير</h3></div>
-    <div class="seg" id="rviewseg" style="margin-top:10px">
-      <button id="rv_rco" class="on" onclick="setView('rco')">الشركة</button>
-      <button id="rv_rpos" onclick="setView('rpos')">المركز المالي</button>
-      <button id="rv_rchart" onclick="setView('rchart')">الحركة الشهرية</button>
-      <button id="rv_rgr" onclick="setView('rgr')">الضمانات</button>
+    <p class="note" style="margin-top:8px">اختر التقرير — يظهر للقراءة على الشاشة مباشرة:</p>
+    <div class="chips" id="rviewseg" style="margin-top:2px">
+      <button type="button" class="chip on" id="rv_rco" onclick="setView('rco')">تقرير الشركة</button>
+      <button type="button" class="chip" id="rv_rclm" onclick="setView('rclm')">المطالبة</button>
+      <button type="button" class="chip" id="rv_rpos" onclick="setView('rpos')">المركز المالي</button>
+      <button type="button" class="chip" id="rv_rchart" onclick="setView('rchart')">الحركة الشهرية</button>
+      <button type="button" class="chip" id="rv_rgr" onclick="setView('rgr')">الضمانات</button>
     </div>
     <button class="more" id="rfbtn" onclick="rfTgl()" style="margin-top:10px">
       <span>تصفية <i id="rfsum">كل الفترات · كل العملات</i></span>
@@ -742,10 +744,17 @@ section{animation:fade .25s ease}
     <div class="ch"><h3>بيان الضمانات الأدبية</h3><span class="mini">كل الضمانات القائمة — لا تتأثر بالتصفية</span></div>
     <div id="rgr"></div>
   </div>
-  <!-- كل الطباعة والتصدير في مكان واحد -->
+  <div class="card vcard hide" data-v="rclm">
+    <div class="ch"><h3>تقرير المطالبة</h3><span class="mini">للقراءة — والطباعة والإكسل من تحت</span></div>
+    <div id="clmopts2"></div>
+    <div id="rclm"></div>
+  </div>
+  <!-- كل الطباعة والتصدير في مكان واحد — مطوي عشان الشاشة تفضل نضيفة -->
   <div class="card" id="expcard">
-    <div class="ch"><h3>الطباعة والتصدير</h3></div>
-    <p class="note" id="expnote" style="margin-bottom:6px"></p>
+    <button class="more" id="expbtn" onclick="expTgl()" style="margin-top:0">
+      <span>الطباعة والتصدير <i>طباعة المعروض · تقرير المطالبة · الإكسل الشامل</i></span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div id="expbody" class="hide">
     <div class="actrow">
       <span class="actlb" id="al_view">التقرير المعروض<i>زي ما هو ظاهر فوق</i></span>
       <button class="iconbtn" id="b_print" onclick="rptPrint()" title="طباعة" aria-label="طباعة التقرير المعروض"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9V3.5h11V9"/><path d="M6.5 17.5h-2a2 2 0 01-2-2v-4.5a2 2 0 012-2h15a2 2 0 012 2v4.5a2 2 0 01-2 2h-2"/><rect x="6.5" y="14" width="11" height="6.5" rx="1.2"/><circle cx="18.2" cy="11.4" r=".9" fill="currentColor" stroke="none"/></svg></button>
@@ -762,6 +771,7 @@ section{animation:fade .25s ease}
     <div class="actrow">
       <span class="actlb">الإكسل الشامل<i>كل الكشوف في ملف واحد — يُرسل للمحاسب شهرياً</i></span>
       <button class="iconbtn x" onclick="exportXLS()" title="تصدير إكسل" aria-label="تصدير الإكسل الشامل"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2.5H6.5a2 2 0 00-2 2v15a2 2 0 002 2h11a2 2 0 002-2V8z"/><path d="M14 2.5V8h5.5"/><path d="M9.3 12.4l5.4 5.4M14.7 12.4l-5.4 5.4"/></svg></button>
+    </div>
     </div>
   </div>
 </section>
@@ -1583,7 +1593,7 @@ let DB=JSON.parse(localStorage.getItem("bg_recs")||"[]");
 let CFG=JSON.parse(localStorage.getItem("bg_cfg")||"{}");
 if(PRESET_URL&&!CFG.url){CFG.url=PRESET_URL;localStorage.setItem("bg_cfg",JSON.stringify(CFG));}
 let kind="in",img=null,cat="",sub="",filt="all",rptYear="all",lsort="d";
-const APPVER="14.00";
+const APPVER="14.10";
 /* آيفون/آيباد/سفاري — سلوك الطباعة والتنزيل مختلف ولازم مسار خاص */
 const IOSLIKE=(function(){try{
   const ua=navigator.userAgent||"";
@@ -2079,13 +2089,14 @@ function acctPersist(x){
 /* ═══ تقرير المطالبة من الشركة — مستند مستقل بكل التفاصيل ═══ */
 let CLM=(function(){try{return JSON.parse(localStorage.getItem("bg_clm"))||{st:"all",sal:1}}catch(e){return {st:"all",sal:1}}})();
 function clmOpts(){
-  const el=$("clmopts");if(!el)return;
-  el.innerHTML=`<div class="chips sm2">`+
+  const h=`<div class="chips sm2">`+
     [["all","كل البنود"],["ok","المعتمد فقط"],["wt","المنتظر فقط"]].map(([v,l])=>
       `<button type="button" class="chip${CLM.st===v?" on":""}" onclick="clmSet('st','${v}')">${l}</button>`).join("")+
     `</div>`+
     `<label class="swrow n" style="margin-top:9px"><span>تشمل مستحقات الراتب والحوافز</span>`+
     `<input type="checkbox" ${CLM.sal?"checked":""} onchange="clmSet('sal',this.checked?1:0)"></label>`;
+  const el=$("clmopts");if(el)el.innerHTML=h;
+  const el2=$("clmopts2");if(el2)el2.innerHTML=h; /* نفس الخيارات في شاشة العرض */
 }
 function clmTgl(){const b=$("clmbox"),t=$("clmbtn");if(!b)return;const op=b.classList.toggle("hide");if(t)t.classList.toggle("open",!op);}
 function clmSet(k,v){CLM[k]=v;try{localStorage.setItem("bg_clm",JSON.stringify(CLM))}catch(e){}
@@ -2877,7 +2888,8 @@ function rfSum(){const el=$("rfsum");if(!el)return;
 function setRpt(p){rptPer=p;$("rcustom").classList.toggle("hide",p!=="c");$("ryearw").classList.toggle("hide",p!=="y");renderRpt();}
 function setRptDate(){rptD1=$("rd1").value;rptD2=$("rd2").value;renderRpt();}
 function setRptCur(v){rptCur=v;renderRpt();}
-const RPTNM={rco:"تقرير الشركة",rpos:"المركز المالي",rchart:"الحركة الشهرية",rgr:"بيان الضمانات الأدبية"};
+const RPTNM={rco:"تقرير الشركة",rclm:"تقرير المطالبة",rpos:"المركز المالي",rchart:"الحركة الشهرية",rgr:"بيان الضمانات الأدبية"};
+function expTgl(){const b=$("expbody"),t=$("expbtn");if(!b)return;const op=b.classList.toggle("hide");if(t)t.classList.toggle("open",!op);}
 function setView(v){
   if(!RPTNM[v])v="rco";
   rptView=v;try{localStorage.setItem("bg_rview",v)}catch(e){}
@@ -2886,7 +2898,7 @@ function setView(v){
   {const fp=$("rfper");if(fp)fp.classList.toggle("hide",v==="rpos");
    const rb=$("rfbtn");if(rb)rb.classList.toggle("hide",v==="rgr");
    if(v==="rgr"){const rf=$("rfilters");if(rf)rf.classList.add("hide");if(rb)rb.classList.remove("open");}}
-  ["rco","rpos","rchart","rgr"].forEach(x=>{const b=$("rv_"+x);if(b)b.classList.toggle("on",x===v);});
+  ["rco","rclm","rpos","rchart","rgr"].forEach(x=>{const b=$("rv_"+x);if(b)b.classList.toggle("on",x===v);});
   const n=$("expnote");if(n)n.textContent="كل الطباعة والتصدير من هنا.";
   const bp=$("b_print");if(bp){bp.title="طباعة "+RPTNM[v];bp.setAttribute("aria-label","طباعة "+RPTNM[v]);}
   const al=$("al_view");if(al)al.innerHTML=esc(RPTNM[v])+"<i>المعروض الآن</i>";
@@ -2896,7 +2908,7 @@ function setView(v){
 /* زر واحد يطبع التقرير المعروض */
 function rptPrint(){
   if(rptView==="rchart"){toast("الرسم البياني للعرض فقط — هيتطبع «تقرير الشركة»");}
-  ({rco:printCo,rpos:printPos,rgr:printGr,rchart:printCo})[rptView||"rco"]();
+  ({rco:printCo,rpos:printPos,rgr:printGr,rchart:printCo,rclm:claimPrint})[rptView||"rco"]();
 }
 function ymLocal(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");}
 function rptFilterPrev(){ /* الفترة المكافئة السابقة */
@@ -3320,8 +3332,39 @@ function renderGrRpt(){
   Object.entries(t).forEach(([k,v])=>{h+=`<div class="nrow neg"><span>الإجمالي — ${esc(k)}</span><b class="num">${fmt(v)} ${CSY[k]||k}</b></div>`;});
   el.innerHTML=h;
 }
+function renderClm(){ /* عرض تقرير المطالبة على الشاشة — نفس أرقام الطباعة والإكسل بالظبط */
+  const el=$("rclm");if(!el)return;
+  const R=claimRows(),P=claimPaid();
+  const R2v=v=>Math.round((+v||0)*100)/100;
+  if(!R.length&&!P.length){el.innerHTML='<p class="note">لا توجد بنود مطالبة في الفترة المعروضة.</p>';return;}
+  const G={};R.forEach(r=>{G[r.g]=G[r.g]||{n:0,v:0,st:r.st};G[r.g].n++;G[r.g].v+=r.usd;});
+  const rows=Object.entries(G).sort((a,b)=>b[1].v-a[1].v);
+  const totR=R.reduce((a,r)=>a+r.usd,0), totP=P.reduce((a,r)=>a+r.usd,0);
+  let h='<p class="note" style="margin-top:10px">'+esc(clmTxt())+' · جميع القيم بالدولار الأمريكي</p>';
+  h+='<div class="sttw"><table class="sttbl" style="min-width:440px">';
+  h+='<tr><th>البند</th><th>عدد</th><th>القيمة $</th><th>الحالة</th></tr>';
+  rows.forEach(pair=>{const k=pair[0],v=pair[1];
+    h+='<tr><td class="ds">'+esc(k)+'</td><td class="c">'+v.n+'</td><td class="m">'+fmt(R2v(v.v))+'</td><td class="c">'+esc(v.st||"")+'</td></tr>';});
+  h+='<tr class="tt"><td>إجمالي المطالبة</td><td></td><td class="m">'+fmt(R2v(totR))+'</td><td></td></tr>';
+  if(P.length&&CLM.st==="all"){
+    h+='<tr><td class="ds">المسدَّد من الشركة (دفعات وردّ مصروفات)</td><td class="c">'+P.length+'</td><td class="m out">'+fmt(R2v(totP))+'</td><td></td></tr>';
+  }
+  if(CLM.st==="all"){
+    const pre=claimPre();
+    const od=Math.round((OPEN.claim-(OPEN.br||[]).reduce((a,b)=>a+(+b.amt||0),0))*100)/100;
+    if(pre)h+='<tr><td class="ds">صافي حركة ما قبل الفترة المعروضة</td><td></td><td class="m">'+fmt(R2v(pre))+'</td><td></td></tr>';
+    if(od)h+='<tr><td class="ds">رصيد افتتاحي غير موزَّع على المكوّنات</td><td></td><td class="m">'+fmt(R2v(od))+'</td><td></td></tr>';
+    h+='<tr class="tt"><td>رصيد المطالبة</td><td></td><td class="m">'+fmt(R2v(totR+pre+od-totP))+'</td><td></td></tr>';
+  }else{
+    h+='<tr class="tt"><td>رصيد المطالبة الكامل (كل البنود)</td><td></td><td class="m">'+fmt(R2v(claimCalc().bal))+'</td><td></td></tr>';
+  }
+  h+='</table></div>';
+  const w=R.filter(r=>r.n&&String(r.n).indexOf("بانتظار سعر الصرف")>-1);
+  if(w.length)h+='<p class="note" style="margin-top:8px">⚠ '+w.length+' بند بانتظار سعر الصرف — غير محسوب في الإجمالي.</p>';
+  el.innerHTML=h;
+}
 function renderRpt(){
-  {["rco","rpos","rchart","rgr"].forEach(v=>{const b=$("rv_"+v);if(b)b.classList.toggle("on",v===rptView);});
+  {["rco","rclm","rpos","rchart","rgr"].forEach(v=>{const b=$("rv_"+v);if(b)b.classList.toggle("on",v===rptView);});
    document.querySelectorAll(".vcard").forEach(c=>c.classList.toggle("hide",c.dataset.v!==rptView));
    rfSum();try{renderGrRpt();}catch(e){}}
 
@@ -3361,6 +3404,8 @@ function renderRpt(){
   try{renderCo();}catch(e){logErr("rco",e);const el=$("rco");if(el)el.innerHTML=`<div class="note">تعذّر حساب تقرير الشركة.</div>`;}
 
   try{renderPos();}catch(e){logErr("rpos",e);const el=$("rpos");if(el)el.innerHTML=`<div class="note">تعذّر حساب المركز المالي.</div>`;}
+
+  try{renderClm();}catch(e){logErr("rclm",e);const el=$("rclm");if(el)el.innerHTML=`<div class="note">تعذّر حساب تقرير المطالبة.</div>`;}
   
   /* الرسم الشهري — آخر ٦ شهور بالعملة الرئيسية */
   const mons=[];{const b=new Date();for(let i=5;i>=0;i--){mons.push(ymLocal(new Date(b.getFullYear(),b.getMonth()-i,1)));}}
