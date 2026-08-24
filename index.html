@@ -1593,7 +1593,7 @@ let DB=JSON.parse(localStorage.getItem("bg_recs")||"[]");
 let CFG=JSON.parse(localStorage.getItem("bg_cfg")||"{}");
 if(PRESET_URL&&!CFG.url){CFG.url=PRESET_URL;localStorage.setItem("bg_cfg",JSON.stringify(CFG));}
 let kind="in",img=null,cat="",sub="",filt="all",rptYear="all",lsort="d";
-const APPVER="14.30";
+const APPVER="14.40";
 /* آيفون/آيباد/سفاري — سلوك الطباعة والتنزيل مختلف ولازم مسار خاص */
 const IOSLIKE=(function(){try{
   const ua=navigator.userAgent||"";
@@ -1803,7 +1803,8 @@ function restoreTrash(tid){
    const ecat=x.k==="rec"?"rec":(x.k==="pf"?"pf":"ext");
    OUT=OUT.filter(o=>!(o.e===ecat&&o.act==="del"&&o.item&&String(o.item.id)===String(rid)&&(ecat!=="pf"||o.t===undefined||o.t===x.d.t)));saveOUT();
    try{delete MISS["r"+rid];if(x.k==="pf")delete MISS["p"+x.d.t+"-"+rid];if(x.k==="ext")delete MISS["x"+rid];}catch(e){}}
-  if(x.k==="rec"){ if(!DB.find(r=>r.id===x.d.id)){const r=Object.assign({},x.d);r.sy=0;DB.push(r);save();} }
+  if(x.k==="rec"){ if(!DB.find(r=>r.id===x.d.id)){const r=Object.assign({},x.d);r.sy=0;r.up=Date.now();DB.push(r);save();}
+    try{GONE[x.d.id]={t:Date.now(),a:1};saveGone();}catch(e){} }
   else if(x.k==="pf"){ const t=x.d.t; if(!PF[t].find(v=>v.id===x.d.item.id)){PF[t].push(x.d.item);savePF();queueOp({e:"pf",t:t,act:"add",item:x.d.item});} }
   else if(x.k==="ext"){ if(!SAL.extras.find(v=>v.id===x.d.id)){SAL.extras.push(x.d);saveSAL();queueOp({e:"ext",act:"add",item:x.d});} }
   TRASH=TRASH.filter(v=>v.tid!==tid);saveTRASH();
@@ -2481,6 +2482,8 @@ function clearForm(){
   $("f_amt").value="";$("f_des").value="";$("f_who").value="";
   $("f_fx").value="";$("f_date").value=today();
   img=null;PDFATT=null;const p=$("prev");if(p){p.src="";p.classList.add("hide");}
+  {const fi=$("f_img");if(fi)fi.value="";
+   const fl=$("flabel");if(fl)fl.innerHTML='<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg> تصوير الإيصال أو اختيار صورة / PDF';}
   const cs=$("f_cst"),rf=$("f_ref");if(cs)cs.checked=false;if(rf)rf.checked=false;
   sub="";const sw=$("subwrap2");if(sw)sw.classList.add("hide");
   try{document.querySelectorAll("#catchips2 .chip.on,#subchips2 .chip.on,#whochips .chip.on").forEach(c=>c.classList.remove("on"));}catch(e){}
@@ -2772,7 +2775,8 @@ function saveRec(){
   window.__dupOk=false;
   const base={k:kind,src:fromCust?"cust":"",date:fdate,amt:a,cur:cur,
     who:$("f_who").value.trim(),cat:cat,sub:sub,des:$("f_des").value.trim(),img:img,
-    fx:fx||"", usd:(fx?Math.round(a/fx*100)/100:(cur==="دولار"?a:"")), ref:ref?1:0};
+    fx:fx||"", usd:(fx?Math.round(a/fx*100)/100:(cur==="دولار"?a:"")), ref:ref?1:0,
+    up:Date.now()}; /* طابع وقت التعديل — الأحدث بيكسب عند تعارض المزامنة */
   if(editId){
     const r=DB.find(x=>x.id===editId);
     if(r){Object.assign(r,base);r.sy=0;}
@@ -2890,7 +2894,8 @@ function renderLog(){
   rows.forEach(r=>{if(byDay&&r.date!==last){h+=`<div class="day">${dayLabel(r.date)}</div>`;last=r.date;}h+=row(r,1);});
   $("loglist").innerHTML=h;
 }
-function toTrash(kind,payload,label){TRASH.unshift({tid:Date.now()+Math.floor(Math.random()*999),k:kind,at:today(),label:label,d:payload});if(TRASH.length>300)TRASH.pop();saveTRASH();}
+function toTrash(kind,payload,label){TRASH.unshift({tid:Date.now()+Math.floor(Math.random()*999),k:kind,at:today(),label:label,d:payload});if(TRASH.length>300)TRASH.pop();saveTRASH();
+  try{if(kind==="rec"&&payload&&payload.id){GONE[payload.id]={t:Date.now(),a:0};saveGone();}}catch(e){}}
 function delRec(id){ask("حذف العملية","هتروح لسلة المحذوفات — تقدر ترجّعها في أي وقت.",()=>{
   const r=DB.find(x=>x.id===id); if(!r)return;
   toTrash("rec",r,catName(r.cat)+(r.sub?" › "+r.sub:"")+" — "+fmt(r.amt)+" "+(CSY[r.cur]||r.cur));
@@ -3350,6 +3355,7 @@ function renderGrRpt(){
 }
 function renderClm(){ /* عرض تقرير المطالبة على الشاشة — نفس أرقام الطباعة والإكسل بالظبط */
   const el=$("rclm");if(!el)return;
+  try{clmOpts();}catch(e){} /* الخيارات لازم تظهر حتى لو الشاشة فتحت مباشرة على المطالبة */
   const R=claimRows(),P=claimPaid();
   const R2v=v=>Math.round((+v||0)*100)/100;
   if(!R.length&&!P.length){el.innerHTML='<p class="note">لا توجد بنود مطالبة في الفترة المعروضة.</p>';return;}
@@ -3375,6 +3381,19 @@ function renderClm(){ /* عرض تقرير المطالبة على الشاشة 
     h+='<tr class="tt"><td>رصيد المطالبة الكامل (كل البنود)</td><td></td><td class="m">'+fmt(R2v(claimCalc().bal))+'</td><td></td></tr>';
   }
   h+='</table></div>';
+  if(CLM.sal&&SAL.amt>0){ /* نفس قسم «ثالثاً» في الطباعة والإكسل — منفصل عن رصيد المطالبة */
+    try{
+      const sc=salCalc();
+      h+='<p class="note" style="margin-top:12px">مستحقات الراتب والحوافز — منفصلة عن رصيد المطالبة، بعملة '+esc(SAL.cur)+'</p>';
+      h+='<div class="sttw"><table class="sttbl" style="min-width:340px">';
+      h+='<tr><th>البند</th><th>القيمة ('+esc(CSY[SAL.cur]||SAL.cur)+')</th></tr>';
+      h+='<tr><td class="ds">المستحق حتى الآن ('+sc.n+' شهر)</td><td class="m">'+fmt(R2v(sc.acc))+'</td></tr>';
+      if(sc.ext)h+='<tr><td class="ds">حوافز ومستحقات إضافية</td><td class="m">'+fmt(R2v(sc.ext))+'</td></tr>';
+      h+='<tr><td class="ds">المقبوض</td><td class="m out">'+fmt(R2v(sc.rec))+'</td></tr>';
+      h+='<tr class="tt"><td>صافي مستحقات الراتب</td><td class="m">'+fmt(R2v(sc.bal))+'</td></tr>';
+      h+='</table></div>';
+    }catch(e){}
+  }
   const w=R.filter(r=>r.n&&String(r.n).indexOf("بانتظار سعر الصرف")>-1);
   if(w.length)h+='<p class="note" style="margin-top:8px">⚠ '+w.length+' بند بانتظار سعر الصرف — غير محسوب في الإجمالي.</p>';
   el.innerHTML=h;
@@ -3770,8 +3789,34 @@ let FB={api:"",db:"",em:"",rt:"",on:0,up:{}};
 try{FB=Object.assign(FB,JSON.parse(localStorage.getItem("bg_fb")||"{}"));if(!FB.up)FB.up={};}catch(e){}
 let FBTOK={t:"",exp:0},FBSH=null,FBAPPLY=false,FBTMR=0,FBBUSY=false,FBAGAIN=false,
     FBES=null,FBRETMR=0,FBTOKTMR=0,FBST={live:0,last:0};
-const FBSECS=["pf","sal","open","trash","who"];
-const FBKEY={bg_recs:"recs",bg_pf:"pf",bg_sal:"sal",bg_open:"open",bg_trash:"trash",bg_didx:"didx"};
+const FBSECS=["gone","pf","sal","open","trash","who"];
+const FBKEY={bg_recs:"recs",bg_pf:"pf",bg_sal:"sal",bg_open:"open",bg_trash:"trash",bg_didx:"didx",bg_gone:"gone"};
+/* شواهد الحذف: id → {t:وقت, a:0 محذوف / 1 مسترجَع} — عشان جهاز غايب فترة طويلة ما يرجّعش عملية محذوفة */
+let GONE={};try{GONE=JSON.parse(localStorage.getItem("bg_gone")||"{}")||{};}catch(e){}
+const saveGone=()=>safeSet("bg_gone",JSON.stringify(GONE));
+function fbEmptyV(s){return (s==="trash"||s==="who")?[]:{};} /* السيرفر بيشيل المصفوفات الفاضية من الكتلة */
+function fbGoneApply(v){ /* دمج الشواهد بالطابع الأحدث لكل عملية + تنفيذ الحذف محلياً */
+  v=(v&&typeof v==="object")?v:{};
+  let ch=false;
+  Object.keys(v).forEach(id=>{const inc=v[id];if(!inc)return;
+    const cur=GONE[id];
+    if(!cur||(+inc.t||0)>(+cur.t||0)){GONE[id]=inc;ch=true;}});
+  if(ch)saveGone();
+  let del=false;
+  Object.keys(GONE).forEach(id=>{const g=GONE[id];if(!g||g.a)return;
+    const loc=DB.find(x=>String(x.id)===String(id));
+    if(loc&&(+g.t||0)>(+loc.up||0)){DB=DB.filter(x=>x!==loc);del=true;}});
+  if(del)save();
+  return ch||del;
+}
+function fbTrashUnion(v){ /* السلة بتتجمع من كل الأجهزة — محدش يمسح نسخة استرجاع عند التاني */
+  const inc=Array.isArray(v)?v:[];
+  const seen={};(TRASH||[]).forEach(x=>{if(x&&x.tid)seen[x.tid]=1;});
+  let ch=false;
+  inc.forEach(x=>{if(x&&x.tid&&!seen[x.tid]){TRASH.push(x);ch=true;}});
+  if(ch){TRASH.sort((a,b)=>(+b.tid||0)-(+a.tid||0));if(TRASH.length>300)TRASH.length=300;saveTRASH();}
+  return ch;
+}
 function fbRaw(k,v){try{localStorage.setItem(k,v);try{IDB.set(k,v);}catch(_m){}}catch(e){}}
 function saveFBRaw(){fbRaw("bg_fb",JSON.stringify(FB));}
 function cst(o){ /* تمثيل ثابت للمقارنة — السيرفر بيرجّع المفاتيح بترتيب مختلف */
@@ -3779,20 +3824,17 @@ function cst(o){ /* تمثيل ثابت للمقارنة — السيرفر بي
   if(Array.isArray(o))return "["+o.map(cst).join(",")+"]";
   return "{"+Object.keys(o).sort().filter(k=>o[k]!==undefined).map(k=>JSON.stringify(k)+":"+cst(o[k])).join(",")+"}";
 }
-function fbGet(s){return s==="pf"?PF:s==="sal"?SAL:s==="open"?OPEN:s==="trash"?(TRASH||[]):(WHO||[]);}
+function fbGet(s){return s==="pf"?PF:s==="sal"?SAL:s==="open"?OPEN:s==="trash"?(TRASH||[]):s==="gone"?(GONE||{}):(WHO||[]);}
 function fbSetLocal(s,v){
   if(s==="pf"){PF=Object.assign({},SEED_PF,v||{});["cash","as","dbt","due","gr","zak"].forEach(t=>{if(!Array.isArray(PF[t]))PF[t]=[];});savePF();}
   else if(s==="sal"){SAL=Object.assign({mode:"m",amt:0,cur:"دولار",start:today().slice(0,7),dist:1,extras:[],end:""},v||{});if(!Array.isArray(SAL.extras))SAL.extras=[];saveSAL();}
   else if(s==="open"){OPEN=v||{claim:0,date:today()};saveOPEN();}
-  else if(s==="trash"){TRASH=Array.isArray(v)?v:[];saveTRASH();
-    const ids={};TRASH.forEach(x=>{if(x.k==="rec"&&x.d&&x.d.id)ids[x.d.id]=1;});
-    const n=DB.length;DB=DB.filter(r=>!ids[r.id]);if(DB.length!==n)save();}
   else if(s==="who"){WHO=Array.isArray(v)?v:[];fbRaw("bg_who",JSON.stringify(WHO));}
 }
 function fbTouch(k){ /* بتتنادى من safeSet مع أي حفظ بيانات */
   if(FBAPPLY||!FB.on)return;
   const s=FBKEY[k];if(!s)return;
-  if(s!=="recs"&&s!=="didx"){FB.up[s]=Date.now();saveFBRaw();}
+  if(s!=="recs"&&s!=="didx"&&s!=="gone"&&s!=="trash"){FB.up[s]=Date.now();saveFBRaw();} /* السلة والشواهد بيندمجوا بالمحتوى مش بطابع الكتلة */
   clearTimeout(FBTMR);FBTMR=setTimeout(()=>fbPush(false),2500);
 }
 function fbNormDb(u){
@@ -3868,16 +3910,20 @@ function fbFullMerge(d){ /* أول بث من السيرفر: دمج شامل ب�
   const F=FBAPPLY;FBAPPLY=true;
   try{
     FBSECS.forEach(s=>{const inc=d[s];
-      if(inc&&inc.v!==undefined){sh.b[s]=cst(inc.v);
-        if((+inc.up||0)>(FB.up[s]||0)){fbSetLocal(s,inc.v);FB.up[s]=+inc.up||0;}}
+      if(inc&&(+inc.up||0)>0){
+        const v=(inc.v!==undefined)?inc.v:fbEmptyV(s);
+        sh.b[s]=cst(v);
+        if(s==="gone")fbGoneApply(v); /* الشواهد الأول — بتحسم مين اتحذف قبل دمج العمليات */
+        else if(s==="trash")fbTrashUnion(v);
+        else if((+inc.up||0)>(FB.up[s]||0)){fbSetLocal(s,v);FB.up[s]=+inc.up||0;}}
       else sh.b[s]="~";});
     saveFBRaw();
-    const trashIds={};(TRASH||[]).forEach(x=>{if(x.k==="rec"&&x.d&&x.d.id)trashIds[x.d.id]=1;});
     const srecs=(d.recs&&typeof d.recs==="object")?d.recs:{};
     let ch=false;
     Object.keys(srecs).forEach(id=>{const sr=srecs[id];if(!sr||typeof sr!=="object")return;
       sh.recs[id]=cst(sr);
-      if(trashIds[sr.id])return; /* محذوفة محلياً — الدفعة الجاية هتمسحها من السيرفر */
+      const g=GONE[id];
+      if(g&&!g.a&&(+g.t||0)>(+sr.up||0))return; /* محذوفة عندنا بعد آخر تعديل ليها — الدفعة الجاية هتمسحها من السيرفر */
       const loc=DB.find(x=>String(x.id)===String(id));
       if(!loc){DB.push(sr);ch=true;}
       else if(cst(loc)!==cst(sr)&&(+sr.up||0)>(+loc.up||0)){DB[DB.indexOf(loc)]=sr;ch=true;}});
@@ -3912,22 +3958,29 @@ function fbRec(id,data){ /* عملية واحدة وصلت من جهاز تان�
       const loc=DB.find(x=>String(x.id)===String(id));
       if(loc){if(cst(loc)!==j&&(+data.up||0)>=(+loc.up||0)){DB[DB.indexOf(loc)]=data;save();ch=true;}}
       else{
-        const tr=(TRASH||[]).some(x=>x.k==="rec"&&x.d&&String(x.d.id)===String(id));
-        if(!tr){DB.push(data);save();ch=true;toast("وصلت عملية جديدة من جهاز آخر");}
+        const g=GONE[id];
+        if(!(g&&!g.a&&(+g.t||0)>=(+data.up||0))){DB.push(data);save();ch=true;toast("وصلت عملية جديدة من جهاز آخر");}
       }
     }
   }finally{FBAPPLY=F;}
   if(ch){FBST.last=Date.now();fbStatus();fbRefresh();}
 }
-function fbBlob(s,data){ /* كتلة (حسابات/راتب/…) وصلت من جهاز تاني */
-  if(!FBSH||!data||data.v===undefined)return;
-  const j=cst(data.v),old=FBSH.b[s];
+function fbBlob(s,data){ /* كتلة (حسابات/راتب/سلة/شواهد…) وصلت من جهاز تاني */
+  if(!FBSH||!data||!(+data.up||0))return;
+  const v=(data.v!==undefined)?data.v:fbEmptyV(s); /* السيرفر بيسقط القيمة لو كلها فاضية */
+  const j=cst(v),old=FBSH.b[s];
   FBSH.b[s]=j;
   if(old===j)return;
-  if((+data.up||0)<=(FB.up[s]||0))return; /* نسختنا المحلية أحدث */
-  const F=FBAPPLY;FBAPPLY=true;
-  try{fbSetLocal(s,data.v);FB.up[s]=+data.up||0;saveFBRaw();}finally{FBAPPLY=F;}
-  FBST.last=Date.now();fbStatus();fbRefresh();
+  const F=FBAPPLY;FBAPPLY=true;let ch=true;
+  try{
+    if(s==="gone")ch=fbGoneApply(v);
+    else if(s==="trash")ch=fbTrashUnion(v);
+    else{
+      if((+data.up||0)<=(FB.up[s]||0))return; /* نسختنا المحلية أحدث */
+      fbSetLocal(s,v);FB.up[s]=+data.up||0;saveFBRaw();
+    }
+  }finally{FBAPPLY=F;}
+  if(ch){FBST.last=Date.now();fbStatus();fbRefresh();}
 }
 async function fbStream(){
   if(!FB.on||!FB.db)return;
@@ -4006,15 +4059,23 @@ async function docAttachRec(recId,att,lbl){ /* إيصال PDF لعملية — �
       {method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({m:meta,d:att.d})},120000);
     if(!r.ok)throw new Error(String(r.status));
     DOCS[id]=meta;saveDocs();
-    const rec=DB.find(x=>x.id===recId);if(rec){rec.doc=id;save();}
+    const rec=DB.find(x=>x.id===recId);
+    const old=rec&&rec.doc;
+    if(rec){rec.doc=id;save();}
+    if(old&&old!==id){ /* إيصال قديم اتبدّل — نظّفه من السحابة والفهرس */
+      if(DOCS[old]){delete DOCS[old];saveDocs();}
+      try{fetchT(FB.db+"/docs/"+old+".json?auth="+encodeURIComponent(tok),{method:"DELETE"},30000);}catch(_e){}
+    }
     toast("اترفع إيصال الـ PDF ✓");
   }catch(e){toast("تعذّر رفع إيصال الـ PDF — تقدر ترفعه بعدين من شاشة المستندات",1);}
 }
 function openDocs(t,id){DOCF=(t&&id)?{t:t,id:id}:null;go("docs");}
-function pfItemName(t,id){try{const x=(PF[t]||[]).find(v=>v.id===id);return x?(x.name||""):"";}catch(e){return "";}}
+function pfItemName(t,id){try{const x=(PF[t]||[]).find(v=>v.id===id);return x?(x.name||x.year||""):"";}catch(e){return "";}}
 function docRefName(r){if(!r)return "";
   if(r.t==="rec"){const x=DB.find(v=>v.id===r.id);
     return x?("إيصال عملية — "+catName(x.cat)+" "+dmy(x.date)):"إيصال عملية";}
+  if(r.t==="br"){const x=(OPEN.br||[]).find(v=>v.id===r.id);
+    return x?("مكوّن افتتاحي — "+(x.name||"")):"مكوّن افتتاحي";}
   const n=pfItemName(r.t,r.id);
   const L={cash:"نقدية",as:"ممتلكات",dbt:"دين",due:"مستحق",gr:"ضمان",zak:"زكاة"};
   return n?((L[r.t]||"")+" — "+n):"";}
@@ -4039,10 +4100,12 @@ function renderDocs(){
   tl.textContent=DOCF?("مستندات: "+(docRefName(DOCF)||"بند")):"كل المستندات";
   const sel=$("dc_ref");
   let h='<option value="">بدون ربط</option>';
-  [["cash","النقدية والبنوك"],["as","الممتلكات"],["dbt","ديون"],["due","مستحقات"],["gr","ضمانات"]].forEach(pair=>{
+  [["cash","النقدية والبنوك"],["as","الممتلكات"],["dbt","ديون"],["due","مستحقات"],["gr","ضمانات"],["zak","زكاة"]].forEach(pair=>{
     const t=pair[0],lb=pair[1];
     (PF[t]||[]).forEach(x=>{const v=t+":"+x.id,s=(DOCF&&DOCF.t===t&&DOCF.id===x.id)?" selected":"";
-      h+='<option value="'+v+'"'+s+'>'+lb+" — "+esc(x.name||"")+"</option>";});});
+      h+='<option value="'+v+'"'+s+'>'+lb+" — "+esc(x.name||x.year||"")+"</option>";});});
+  (OPEN.br||[]).forEach(x=>{const s=(DOCF&&DOCF.t==="br"&&DOCF.id===x.id)?" selected":"";
+    h+='<option value="br:'+x.id+'"'+s+'>مكوّن افتتاحي — '+esc(x.name||"")+"</option>";});
   sel.innerHTML=h;
   let tot=0;Object.keys(DOCS).forEach(id=>{tot+=(+(DOCS[id]&&DOCS[id].s)||0);});
   const us=$("dc_usage");
@@ -4120,10 +4183,12 @@ async function docOpen(id){
   toast("جاري تحميل «"+(m.n||"")+"»…");
   try{
     const r=await fetchT(FB.db+"/docs/"+id+"/d.json?auth="+encodeURIComponent(tok),{},120000);
-    let b64=null;try{b64=await r.json();}catch(_){}
-    if(!r.ok||typeof b64!=="string"||!b64){
+    let b64=null,ok=r.ok;
+    try{b64=await r.json();}catch(_){ok=false;}
+    if(ok&&b64===null){ /* السيرفر بيقول الملف مش موجود فعلاً — مش عطل مؤقت */
       delete DOCS[id];saveDocs();renderDocs();
       toast("الملف غير موجود — غالباً اتحذف من جهاز آخر",1);return;}
+    if(!ok||typeof b64!=="string"||!b64){toast("تعذّر التحميل — تحقق من الإنترنت وحاول تاني",1);return;}
     const bin=atob(b64),arr=new Uint8Array(bin.length);
     for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
     const ext=String(m.t||"").indexOf("pdf")>-1?".pdf":".jpg";
@@ -4175,7 +4240,7 @@ function backup(){
 }
 function bkPack(){ /* حزمة النسخة الكاملة — مستخدمة في النسخ اليدوي والتلقائي */
   return {v:2,app:"سجل حساباتي",at:new Date().toISOString(),
-    db:DB, pf:PF, sal:SAL, open:OPEN, trash:TRASH||[], who:WHO, docs:DOCS||{},
+    db:DB, pf:PF, sal:SAL, open:OPEN, trash:TRASH||[], who:WHO, docs:DOCS||{}, gone:GONE||{},
     cfg:{name:CFG.name||"",url:CFG.url||""},
     fs:(function(){try{return localStorage.getItem("bg_fs")||"m"}catch(e){return "m"}})()};
 }
@@ -4227,6 +4292,7 @@ function applyRestore(d){
       if(d.trash){TRASH=d.trash;saveTRASH();}
       if(d.who){WHO=d.who;try{localStorage.setItem("bg_who",JSON.stringify(WHO))}catch(x){}}
       if(d.docs&&typeof d.docs==="object"){DOCS=d.docs;saveDocs();}
+      if(d.gone&&typeof d.gone==="object"){GONE=d.gone;saveGone();}
       if(d.cfg){CFG.name=d.cfg.name||CFG.name;if(d.cfg.url)CFG.url=d.cfg.url;if(d.cfg.key)CFG.key=d.cfg.key;saveCfg();}
       if(d.fs){try{localStorage.setItem("bg_fs",d.fs)}catch(x){}applyFS();}
       syncBar();go("home");toast("تمت استعادة كل البيانات");
