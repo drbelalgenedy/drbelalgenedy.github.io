@@ -653,11 +653,11 @@ section{animation:fade .25s ease}
       <label>النوع الفرعي</label>
       <div class="chips" id="subchips"></div>
     </div>
-    <label>صورة الإيصال</label>
+    <label>إيصال العملية (صورة أو PDF)</label>
     <label class="file" for="f_img" id="flabel">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
-      تصوير الإيصال أو اختيار صورة</label>
-    <input type="file" id="f_img" accept="image/*">
+      تصوير الإيصال أو اختيار صورة / PDF</label>
+    <input type="file" id="f_img" accept="image/*,application/pdf">
     <img id="prev" class="prev hide">
     </div>
     <button class="btn p" onclick="saveRec()">
@@ -1593,7 +1593,7 @@ let DB=JSON.parse(localStorage.getItem("bg_recs")||"[]");
 let CFG=JSON.parse(localStorage.getItem("bg_cfg")||"{}");
 if(PRESET_URL&&!CFG.url){CFG.url=PRESET_URL;localStorage.setItem("bg_cfg",JSON.stringify(CFG));}
 let kind="in",img=null,cat="",sub="",filt="all",rptYear="all",lsort="d";
-const APPVER="14.20";
+const APPVER="14.30";
 /* آيفون/آيباد/سفاري — سلوك الطباعة والتنزيل مختلف ولازم مسار خاص */
 const IOSLIKE=(function(){try{
   const ua=navigator.userAgent||"";
@@ -2480,7 +2480,7 @@ function formCancel(){
 function clearForm(){
   $("f_amt").value="";$("f_des").value="";$("f_who").value="";
   $("f_fx").value="";$("f_date").value=today();
-  img=null;const p=$("prev");if(p){p.src="";p.classList.add("hide");}
+  img=null;PDFATT=null;const p=$("prev");if(p){p.src="";p.classList.add("hide");}
   const cs=$("f_cst"),rf=$("f_ref");if(cs)cs.checked=false;if(rf)rf.checked=false;
   sub="";const sw=$("subwrap2");if(sw)sw.classList.add("hide");
   try{document.querySelectorAll("#catchips2 .chip.on,#subchips2 .chip.on,#whochips .chip.on").forEach(c=>c.classList.remove("on"));}catch(e){}
@@ -2528,7 +2528,7 @@ function go(s,isBack){
 }
 let catManual=false;
 function openForm(k,eid){
-  kind=k;img=null;cat="";sub="";catManual=false;editId=eid||0;
+  kind=k;img=null;PDFATT=null;cat="";sub="";catManual=false;editId=eid||0;
   const E=editId?DB.find(r=>r.id===editId):null;
   if(E){kind=E.k;k=E.k;}
   /* نص زر الإلغاء حسب السياق — «مسح الخانات» في وضع التعديل كان مضللاً (بيرجع من غير حفظ) */
@@ -2719,6 +2719,18 @@ function pickSub(el){catManual=true;sub=el.textContent;
 $("f_des").addEventListener("input",e=>{if(!catManual)autoCat(e.target.value);});
 $("f_img").addEventListener("change",e=>{
   const f=e.target.files[0];if(!f)return;
+  const isPdf=(f.type==="application/pdf")||/\.pdf$/i.test(f.name||"");
+  if(isPdf){ /* الـ PDF يتخزن في السحابة مع الحفظ — مش جوه الجهاز زي الصور */
+    if(f.size>5*1048576){toast("ملف الـ PDF أكبر من 5 ميجا — صغّره الأول",1);e.target.value="";return;}
+    if(!FB.on||!FB.db){toast("إيصال الـ PDF محتاج «مزامنة لايف بين الأجهزة» مفعّلة من الإعدادات",1);e.target.value="";return;}
+    const rd=new FileReader();
+    rd.onload=ev=>{PDFATT={d:String(ev.target.result).split(",")[1],s:f.size};
+      img=null;const p=$("prev");if(p){p.src="";p.classList.add("hide");}
+      $("flabel").innerHTML='<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 📄 تم إرفاق PDF — يُرفع للسحابة مع الحفظ';};
+    rd.readAsDataURL(f);
+    return;
+  }
+  PDFATT=null;
   const r=new FileReader();
   r.onload=ev=>{const i=new Image();
     i.onload=()=>{const c=document.createElement("canvas"),s=Math.min(1,900/Math.max(i.width,i.height));
@@ -2765,12 +2777,15 @@ function saveRec(){
     const r=DB.find(x=>x.id===editId);
     if(r){Object.assign(r,base);r.sy=0;}
     save();syncBar();
+    if(PDFATT){docAttachRec(editId,PDFATT,"إيصال — "+catName(cat)+" "+dmy(fdate));PDFATT=null;}
     queueOp({e:"rec",act:"upd",item:Object.assign({id:editId},base,{img:""})});
     toast("تم حفظ التعديل");
     editId=0;goBack();return;
   }
-  DB.push(Object.assign({id:Date.now()},base));
+  const nid=Date.now();
+  DB.push(Object.assign({id:nid},base));
   save();syncBar();
+  if(PDFATT){docAttachRec(nid,PDFATT,"إيصال — "+catName(cat)+" "+dmy(fdate));PDFATT=null;}
   if(CFG.url){syncNow(false);toast("اتسجلت «"+label(kind)+"» واتبعتت للمحاسب");}else toast("اتسجلت «"+label(kind)+"»");
   if(REGMODE){const k0=kind;openForm(k0);try{renderLog();}catch(e){}}else go("reg");
 }
@@ -2821,7 +2836,8 @@ function recSheet(id){
   if(r.src==="cust")rows.push(["المصدر","من عهدة الشركة"]);
   rows.push(["الحالة",CFG.url?(r.sy?"مُرسَلة للمحاسب":"بانتظار الإرسال"):"محلية"]);
   $("rs_body").innerHTML=rows.map(([k,v])=>`<div class="kv"><span>${k}</span><b>${v}</b></div>`).join("")
-    +((r.img)?`<img src="${r.img}" class="prev" style="margin-top:10px">`:(r.imgf?`<p class="note" style="margin-top:8px">الإيصال محفوظ عند المحاسب (اترفع مع المزامنة)</p>`:""));
+    +((r.img)?`<img src="${r.img}" class="prev" style="margin-top:10px">`:(r.imgf?`<p class="note" style="margin-top:8px">الإيصال محفوظ عند المحاسب (اترفع مع المزامنة)</p>`:""))
+    +((r.doc&&DOCS[r.doc])?`<button class="btn s" style="margin-top:10px" onclick="docOpen('${r.doc}')">📄 فتح إيصال الـ PDF</button>`:"");
   $("rs_edit").onclick=()=>{closeRec();openForm(r.k,r.id);};
   $("rs_edit").textContent="تعديل";
   $("rs_rep").classList.remove("hide");
@@ -2834,7 +2850,7 @@ function recSheet(id){
 function closeRec(){$("recsheet").classList.remove("show");}
 function rowBody(r){
   const cls=r.k==="in"?"i1":r.k==="co"?"i2":"i3",col=(r.k==="in"||r.ref)?"in":r.k==="co"?"co":"out",sg=(r.k==="in"||r.ref)?"+":"−";
-  const tags=(r.ref?'<span class="tag rf">ردّته الشركة</span>':'')+(r.src==="cust"?'<span class="tag">من عهدة الشركة</span>':'')+(CFG.url?(r.sy?'<span class="tag ok">مُرسَلة</span>':'<span class="tag wt">بانتظار</span>'):'')+((r.img||r.imgf)?'<span class="tag">إيصال</span>':'')+(r.dfix?'<span class="tag wt">تاريخ يُراجَع</span>':'')+(r.usd&&r.cur!=="دولار"?`<span class="tag">${fmt(r.usd)} $</span>`:'');
+  const tags=(r.ref?'<span class="tag rf">ردّته الشركة</span>':'')+(r.src==="cust"?'<span class="tag">من عهدة الشركة</span>':'')+(CFG.url?(r.sy?'<span class="tag ok">مُرسَلة</span>':'<span class="tag wt">بانتظار</span>'):'')+((r.img||r.imgf)?'<span class="tag">إيصال</span>':'')+(r.doc?'<span class="tag">PDF</span>':'')+(r.dfix?'<span class="tag wt">تاريخ يُراجَع</span>':'')+(r.usd&&r.cur!=="دولار"?`<span class="tag">${fmt(r.usd)} $</span>`:'');
   return `<div class="row"><span class="ic ${cls}">${ICO[r.k]}</span>
     <span class="mid"><span class="t1">${catName(r.cat)}${r.sub?" › "+r.sub:""}</span>
       <span class="t2">${r.who?esc(r.who)+" · ":""}${esc(r.des)||label(r.k)}</span>
@@ -3978,10 +3994,28 @@ setTimeout(()=>{if(FB.on)fbStream();},3000);
 /* ===== المستندات: PDF وصور — الفهرس متزامن لايف، والملف نفسه في /docs يُجلب عند الطلب ===== */
 let DOCS={};try{DOCS=JSON.parse(localStorage.getItem("bg_didx")||"{}")||{};}catch(e){}
 const saveDocs=()=>safeSet("bg_didx",JSON.stringify(DOCS));
-let DOCF=null,DCFILE=null;
+let DOCF=null,DCFILE=null,PDFATT=null;
+async function docAttachRec(recId,att,lbl){ /* إيصال PDF لعملية — يُرفع للسحابة ويتربط بيها */
+  if(!FB.on||!FB.db){toast("إيصال الـ PDF محتاج «مزامنة لايف» مفعّلة — العملية اتسجلت من غيره",1);return;}
+  const tok=await fbToken();
+  if(!tok){toast("انتهت صلاحية الدخول — إيصال الـ PDF ما اترفعش",1);return;}
+  try{
+    const id=String(Date.now());
+    const meta={n:lbl||"إيصال عملية",t:"application/pdf",s:att.s,at:today(),up:Date.now(),ref:{t:"rec",id:recId}};
+    const r=await fetchT(FB.db+"/docs/"+id+".json?auth="+encodeURIComponent(tok),
+      {method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({m:meta,d:att.d})},120000);
+    if(!r.ok)throw new Error(String(r.status));
+    DOCS[id]=meta;saveDocs();
+    const rec=DB.find(x=>x.id===recId);if(rec){rec.doc=id;save();}
+    toast("اترفع إيصال الـ PDF ✓");
+  }catch(e){toast("تعذّر رفع إيصال الـ PDF — تقدر ترفعه بعدين من شاشة المستندات",1);}
+}
 function openDocs(t,id){DOCF=(t&&id)?{t:t,id:id}:null;go("docs");}
 function pfItemName(t,id){try{const x=(PF[t]||[]).find(v=>v.id===id);return x?(x.name||""):"";}catch(e){return "";}}
-function docRefName(r){if(!r)return "";const n=pfItemName(r.t,r.id);
+function docRefName(r){if(!r)return "";
+  if(r.t==="rec"){const x=DB.find(v=>v.id===r.id);
+    return x?("إيصال عملية — "+catName(x.cat)+" "+dmy(x.date)):"إيصال عملية";}
+  const n=pfItemName(r.t,r.id);
   const L={cash:"نقدية",as:"ممتلكات",dbt:"دين",due:"مستحق",gr:"ضمان",zak:"زكاة"};
   return n?((L[r.t]||"")+" — "+n):"";}
 function fbDidx(id,data){ /* تغيير في فهرس المستندات وصل من جهاز تاني */
