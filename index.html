@@ -657,7 +657,7 @@ section{animation:fade .25s ease}
     <label class="file" for="f_img" id="flabel">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
       تصوير الإيصال أو اختيار صورة</label>
-    <input type="file" id="f_img" accept="image/*" capture="environment">
+    <input type="file" id="f_img" accept="image/*">
     <img id="prev" class="prev hide">
     </div>
     <button class="btn p" onclick="saveRec()">
@@ -1593,7 +1593,7 @@ let DB=JSON.parse(localStorage.getItem("bg_recs")||"[]");
 let CFG=JSON.parse(localStorage.getItem("bg_cfg")||"{}");
 if(PRESET_URL&&!CFG.url){CFG.url=PRESET_URL;localStorage.setItem("bg_cfg",JSON.stringify(CFG));}
 let kind="in",img=null,cat="",sub="",filt="all",rptYear="all",lsort="d";
-const APPVER="14.10";
+const APPVER="14.20";
 /* آيفون/آيباد/سفاري — سلوك الطباعة والتنزيل مختلف ولازم مسار خاص */
 const IOSLIKE=(function(){try{
   const ua=navigator.userAgent||"";
